@@ -342,5 +342,6 @@ The system is **NOT required to**:
   - oh-my-opencode creates `oh-my-opencode.json` in `~/.config/opencode/` to store agent configs. We can learn from this.
 - https://opencode.ai/docs/plugins/
 - https://opencode.ai/docs/agents/
+- https://opencode.ai/docs/sdk/
 - https://github.com/zenobi-us/opencode-plugin-template
   - opencode-plugin-template is a template repository for creating OpenCode plugins. We can learn from this.
