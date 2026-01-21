@@ -14,7 +14,7 @@
     "url": "https://github.com/HuakunShen/opencode-design-lab/issues"
   },
   "exports": {
-    ".": "./.opencode/plugins/index.js",
+    ".": "./.opencode/plugins/design-lab.js",
     "./package.json": "./package.json"
   },
   "files": [

@@ -1,6 +1,9 @@
-import { defineConfig } from 'tsdown'
+import { defineConfig } from "tsdown";
 
 export default defineConfig({
   exports: true,
-  // ...config options
-})
+  dts: false,
+  fixedExtension: false,
+  outDir: ".opencode/plugins",
+  entry: "./src/design-lab.ts",
+});
