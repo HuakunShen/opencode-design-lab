@@ -285,6 +285,7 @@ The config file **MUST** explicitly support:
 - If `review_models` is specified, **only those models** are used for review.
 
 **Implementation Note**:
+
 - The system must support dynamic model selection at runtime based on the config file.
 - Agent model specifications should be overridden from the config, not by dynamically generating agent files.
 - Similar to oh-my-opencode's approach, the plugin should merge config-based model overrides with predefined agent configurations at runtime.

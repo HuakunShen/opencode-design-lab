@@ -1,6 +1,12 @@
-import { defineConfig } from 'tsdown'
+import { defineConfig } from "tsdown";
 
 export default defineConfig({
   exports: true,
-  // ...config options
-})
+  format: ["esm"],
+  outDir: ".opencode/plugins",
+  dts: false,
+  fixedExtension: false,
+  target: "esnext",
+  entry: ["src/index.ts"],
+  external: ["@opencode-ai/plugin", "@opencode-ai/sdk"],
+});
