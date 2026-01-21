@@ -61,6 +61,58 @@ Create a config file at `~/.config/opencode/design-lab.json` or `.opencode/desig
 | `review_agent_temperature` | `number`   | `0.1`              | Temperature for review agents (0-2)                                       |
 | `topic_generator_model`    | `string`   | First design model | Model to use for generating topic names                                   |
 
+## Architecture
+
+```mermaid
+flowchart TB
+    Start([User: Generate Designs]) --> TopicGen[Topic Generator<br/>Generate concise topic name]
+    TopicGen --> CreateDir[Create Lab Directory<br/>.design-lab/YYYY-MM-DD-topic/]
+    CreateDir --> SaveReq[Save Requirements<br/>task.json]
+
+    SaveReq --> D1[Design Agent 1<br/>Model: glm-4.6]
+    SaveReq --> D2[Design Agent 2<br/>Model: glm-4.7]
+
+    D1 --> V1{Schema<br/>Valid?}
+    D2 --> V2{Schema<br/>Valid?}
+
+    V1 -->|Yes| Save1[Save JSON + MD<br/>designs/glm-4-6.json/md]
+    V2 -->|Yes| Save2[Save JSON + MD<br/>designs/glm-4-7.json/md]
+
+    V1 -->|No| Err1[Log Error]
+    V2 -->|No| Err2[Log Error]
+
+    Save1 --> Review([User: Review Designs])
+    Save2 --> Review
+
+    Review --> Load[Load All Designs<br/>JSON files only]
+    Load --> R1[Review Agent 1<br/>Model: glm-4.6]
+    Load --> R2[Review Agent 2<br/>Model: glm-4.7]
+
+    R1 --> Format1[Generate Review MD<br/>+ Score JSON]
+    R2 --> Format2[Generate Review MD<br/>+ Score JSON]
+
+    Format1 --> SaveR1[Save Review<br/>reviews/ + scores/]
+    Format2 --> SaveR2[Save Review<br/>reviews/ + scores/]
+
+    SaveR1 --> Agg([User: Aggregate Scores])
+    SaveR2 --> Agg
+
+    Agg --> LoadScores[Load All Scores]
+    LoadScores --> CalcAvg[Calculate Averages<br/>+ Variance]
+    CalcAvg --> Rank[Assign Rankings<br/>Sort by avg score]
+    Rank --> GenResults[Generate results.md<br/>+ ranking.json]
+    GenResults --> Done([Complete])
+
+    style Start fill:#e1f5ff
+    style Review fill:#e1f5ff
+    style Agg fill:#e1f5ff
+    style Done fill:#c8e6c9
+    style D1 fill:#fff9c4
+    style D2 fill:#fff9c4
+    style R1 fill:#ffe0b2
+    style R2 fill:#ffe0b2
+```
+
 ## Usage
 
 ### 1. Generate Designs
