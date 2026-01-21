@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "design_models": {
+      "minItems": 2,
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "review_models": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "base_output_dir": {
+      "default": ".design-lab",
+      "type": "string"
+    },
+    "design_agent_temperature": {
+      "default": 0.7,
+      "type": "number",
+      "minimum": 0,
+      "maximum": 2
+    },
+    "review_agent_temperature": {
+      "default": 0.1,
+      "type": "number",
+      "minimum": 0,
+      "maximum": 2
+    },
+    "topic_generator_model": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "design_models",
+    "base_output_dir",
+    "design_agent_temperature",
+    "review_agent_temperature"
+  ],
+  "additionalProperties": false
+}

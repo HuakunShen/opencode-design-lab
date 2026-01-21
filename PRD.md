@@ -285,6 +285,7 @@ The config file **MUST** explicitly support:
 - If `review_models` is specified, **only those models** are used for review.
 
 **Implementation Note**:
+
 - The system must support dynamic model selection at runtime based on the config file.
 - Agent model specifications should be overridden from the config, not by dynamically generating agent files.
 - Similar to oh-my-opencode's approach, the plugin should merge config-based model overrides with predefined agent configurations at runtime.
@@ -345,3 +346,24 @@ The system is **NOT required to**:
 - https://opencode.ai/docs/sdk/
 - https://github.com/zenobi-us/opencode-plugin-template
   - opencode-plugin-template is a template repository for creating OpenCode plugins. We can learn from this.
+
+## Example
+
+If I ask AI to design a deepwiki clone for me, and we have 2 design models and 2 reviewer models
+the plugin should
+
+1. create a subfolder with {date}-deepwiki-clone
+2. create 2 markdown files with designs
+3. create 2 review markdown files, pass all design files to each reviewer, reviewer will compare designs and generate reviews in markdown, at the bottom of review generate a score table.
+4. Let each reviewer output a json version of the table so the orchestrator AI agent (our plugin) can read. Not sure how to do this, maybe keep going from previous review session history, or in a new session. I prefer to continue from previous review session history which saves takens from cache.
+   A score table could look something like this.
+   | Model | Technical Feasibility (25%) | System Integration (25%) | Completeness (20%) | Security & Privacy (15%) | Extensibility (15%) | Overall Score |
+   | -------------- | --------------------------- | ------------------------ | ------------------ | ------------------------ | ------------------- | ------------- |
+   | Opus | 24/25 | 25/25 | 19/20 | 15/15 | 14/15 | 92/100 ⭐ |
+   | Droid-Minimax | 23/25 | 23/25 | 18/20 | 13/15 | 11/15 | 88/100 ⭐ |
+   | OpenCode-GLM | 22/25 | 20/25 | 16/20 | 14/15 | 10/15 | 82/100 |
+   | GPT-5-2 | 22/25 | 23/25 | 17/20 | 13/15 | 10/15 | 85/100 ⭐ |
+   | Gemini 3 Pro | 21/25 | 20/25 | 15/20 | 13/15 | 10/15 | 79/100 |
+   | Gemini 3 Flash | 19/25 | 18/25 | 12/20 | 12/15 | 10/15 | 71/100 |
+
+5. With the scores generate a results.md with a summary table of the review session. Which reviewer model rates which design model how much.

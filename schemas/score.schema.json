@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "design_id": {
+      "type": "string"
+    },
+    "reviewer_model": {
+      "type": "string"
+    },
+    "scores": {
+      "type": "object",
+      "properties": {
+        "clarity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10
+        },
+        "feasibility": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10
+        },
+        "scalability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10
+        },
+        "maintainability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10
+        },
+        "completeness": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10
+        },
+        "overall": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10
+        }
+      },
+      "required": [
+        "clarity",
+        "feasibility",
+        "scalability",
+        "maintainability",
+        "completeness",
+        "overall"
+      ],
+      "additionalProperties": false
+    },
+    "justification": {
+      "type": "string"
+    },
+    "strengths": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "weaknesses": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "missing_considerations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "design_id",
+    "reviewer_model",
+    "scores",
+    "justification",
+    "strengths",
+    "weaknesses",
+    "missing_considerations"
+  ],
+  "additionalProperties": false
+}

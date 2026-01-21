@@ -7,3 +7,5 @@
 - https://opencode.ai/docs/plugins/
 - https://opencode.ai/docs/agents/
 - https://opencode.ai/docs/sdk/
+
+we have a `tsdown.config.ts` file that exports js to `.opencode/plugins/design-lab.js` so opencode can load directly.
