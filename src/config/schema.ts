@@ -4,6 +4,7 @@ import { z } from "zod";
  * Configuration schema for OpenCode Design Lab plugin
  */
 export const DesignLabConfigSchema = z.object({
+  "$schema": z.string().optional(),
   /**
    * List of models to use for design generation
    * Each model will generate one independent design

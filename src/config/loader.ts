@@ -40,7 +40,7 @@ function parseJsonc<T>(content: string): T {
   // Remove comments
   const withoutComments = content
     .replace(/\/\*[\s\S]*?\*\//g, "") // Remove block comments
-    .replace(/\/\/.*/g, ""); // Remove line comments
+    .replace(/^\s*\/\/.*/gm, ""); // Remove line comments only at line start
 
   return JSON.parse(withoutComments) as T;
 }
