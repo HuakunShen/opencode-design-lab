@@ -221,22 +221,34 @@ export async function extractSessionOutput(
 
 /**
  * Extract JSON from text that may contain markdown code blocks
+ *
+ * @param text - The text to extract JSON from
+ * @returns The parsed JSON object
+ * @throws Error with context if parsing fails
  */
 export function extractJSON<T>(text: string): T {
-  // Try to extract JSON from markdown code blocks first
-  const jsonBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (jsonBlockMatch) {
-    return JSON.parse(jsonBlockMatch[1].trim()) as T;
-  }
+  try {
+    // Try to extract JSON from markdown code blocks first
+    const jsonBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (jsonBlockMatch) {
+      return JSON.parse(jsonBlockMatch[1].trim()) as T;
+    }
 
-  // Try to find raw JSON (object or array)
-  const jsonMatch = text.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
-  if (jsonMatch) {
-    return JSON.parse(jsonMatch[1]) as T;
-  }
+    // Try to find raw JSON (object or array)
+    const jsonMatch = text.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[1]) as T;
+    }
 
-  // Try parsing the whole thing as JSON
-  return JSON.parse(text.trim()) as T;
+    // Try parsing the whole thing as JSON
+    return JSON.parse(text.trim()) as T;
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    const preview = text.substring(0, 200);
+    throw new Error(
+      `Failed to parse JSON: ${errorMessage}\nText preview: ${preview}${text.length > 200 ? "..." : ""}`,
+    );
+  }
 }
 
 /**

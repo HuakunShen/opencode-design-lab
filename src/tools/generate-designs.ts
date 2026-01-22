@@ -242,11 +242,12 @@ function formatDesignAsMarkdown(design: DesignArtifact, model: string): string {
  */
 async function generateTopic(
   ctx: PluginInput,
-  config: DesignLabConfig,
+  _config: DesignLabConfig,
   requirements: string,
   parentSessionID?: string,
 ): Promise<string> {
-  const _topicModel = config.topic_generator_model || config.design_models[0];
+  // Note: topic_generator_model is available in config for future use
+  // when OpenCode SDK supports explicit model selection in sessions
 
   const sessionID = await createAgentSession(
     ctx,

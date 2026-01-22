@@ -6,6 +6,7 @@ import {
 import * as fs from "fs";
 import * as path from "path";
 import { type DesignLabConfig, type Score, type Ranking } from "../config";
+import { findMostRecentLab } from "../utils/lab-helpers";
 
 interface AggregateScoresArgs {
   lab_path?: string;
@@ -151,28 +152,6 @@ ${rankings
 View the full results in ${path.join(resultsDir, "results.md")}`;
     },
   });
-}
-
-/**
- * Find the most recent design lab directory
- */
-function findMostRecentLab(projectDir: string, baseDir: string): string | null {
-  const labBaseDir = path.join(projectDir, baseDir);
-  if (!fs.existsSync(labBaseDir)) {
-    return null;
-  }
-
-  const labs = fs
-    .readdirSync(labBaseDir)
-    .filter((d) => fs.statSync(path.join(labBaseDir, d)).isDirectory())
-    .sort()
-    .reverse();
-
-  if (labs.length === 0) {
-    return null;
-  }
-
-  return path.join(labBaseDir, labs[0]);
 }
 
 /**

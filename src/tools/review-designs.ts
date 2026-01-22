@@ -17,6 +17,7 @@ import {
   getModelShortName,
 } from "../utils/session-helpers";
 import { logger } from "../utils/logger";
+import { findMostRecentLab } from "../utils/lab-helpers";
 
 interface ReviewDesignsArgs {
   lab_path?: string;
@@ -156,28 +157,6 @@ ${results
 ${successCount > 0 ? `\nNext step: Run the aggregate_scores tool to generate final rankings.` : ""}`;
     },
   });
-}
-
-/**
- * Find the most recent design lab directory
- */
-function findMostRecentLab(projectDir: string, baseDir: string): string | null {
-  const labBaseDir = path.join(projectDir, baseDir);
-  if (!fs.existsSync(labBaseDir)) {
-    return null;
-  }
-
-  const labs = fs
-    .readdirSync(labBaseDir)
-    .filter((d) => fs.statSync(path.join(labBaseDir, d)).isDirectory())
-    .sort()
-    .reverse();
-
-  if (labs.length === 0) {
-    return null;
-  }
-
-  return path.join(labBaseDir, labs[0]);
 }
 
 /**
