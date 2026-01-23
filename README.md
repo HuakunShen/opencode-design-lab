@@ -1,15 +1,16 @@
 # OpenCode Design Lab
 
-An OpenCode plugin that generates multiple independent design proposals using different AI models, then systematically evaluates, compares, and ranks those designs in a reproducible and structured way.
+An OpenCode plugin that registers a primary design agent and model-specific
+subagents to generate and review designs directly to Markdown files.
 
 ## Overview
 
-OpenCode Design Lab treats design as an experimental artifact, not a chat response. It enforces:
+Design Lab uses a file-first, multi-model workflow:
 
-- **Isolation**: Each design agent works independently without seeing other designs
-- **Structure**: All outputs follow predefined JSON schemas
-- **Evaluation**: Multiple reviewers score designs across consistent dimensions
-- **Reproducibility**: Given the same inputs and config, results are reproducible
+- **Dynamic model mapping**: Subagents are created from your config
+- **Correct model usage**: Each subagent is bound to its configured model
+- **File-first outputs**: Designs and reviews are written to disk, not chat
+- **Cross-review**: The same model set reviews all designs in a single report
 
 ## Installation
 
@@ -38,7 +39,8 @@ Then add to your OpenCode config (`~/.config/opencode/opencode.json`):
 
 ## Configuration
 
-Create a config file at `~/.config/opencode/design-lab.json` or `.opencode/design-lab.json`:
+Create a config file at `~/.config/opencode/design-lab.json` or
+`.opencode/design-lab.json`:
 
 ```json
 {
@@ -57,367 +59,68 @@ Create a config file at `~/.config/opencode/design-lab.json` or `.opencode/desig
 | `design_models`            | `string[]` | **Required**       | Models to use for design generation (min 2)                               |
 | `review_models`            | `string[]` | `design_models`    | Models to use for reviews. Defaults to all design models if not specified |
 | `base_output_dir`          | `string`   | `.design-lab`      | Base directory for design lab outputs                                     |
-| `design_agent_temperature` | `number`   | `0.7`              | Temperature for design agents (0-2)                                       |
-| `review_agent_temperature` | `number`   | `0.1`              | Temperature for review agents (0-2)                                       |
-| `topic_generator_model`    | `string`   | First design model | Model to use for generating topic names                                   |
-
-## Architecture
-
-```mermaid
-flowchart TB
-    Start([User: Generate Designs]) --> TopicGen[Topic Generator<br/>Generate concise topic name]
-    TopicGen --> CreateDir[Create Lab Directory<br/>.design-lab/YYYY-MM-DD-topic/]
-    CreateDir --> SaveReq[Save Requirements<br/>task.json]
-
-    SaveReq --> D1[Design Agent 1<br/>Model: glm-4.6]
-    SaveReq --> D2[Design Agent 2<br/>Model: glm-4.7]
-
-    D1 --> V1{Schema<br/>Valid?}
-    D2 --> V2{Schema<br/>Valid?}
-
-    V1 -->|Yes| Save1[Save JSON + MD<br/>designs/glm-4-6.json/md]
-    V2 -->|Yes| Save2[Save JSON + MD<br/>designs/glm-4-7.json/md]
-
-    V1 -->|No| Err1[Log Error]
-    V2 -->|No| Err2[Log Error]
-
-    Save1 --> Review([User: Review Designs])
-    Save2 --> Review
-
-    Review --> Load[Load All Designs<br/>JSON files only]
-    Load --> R1[Review Agent 1<br/>Model: glm-4.6]
-    Load --> R2[Review Agent 2<br/>Model: glm-4.7]
-
-    R1 --> Format1[Generate Review MD<br/>+ Score JSON]
-    R2 --> Format2[Generate Review MD<br/>+ Score JSON]
-
-    Format1 --> SaveR1[Save Review<br/>reviews/ + scores/]
-    Format2 --> SaveR2[Save Review<br/>reviews/ + scores/]
-
-    SaveR1 --> Agg([User: Aggregate Scores])
-    SaveR2 --> Agg
-
-    Agg --> LoadScores[Load All Scores]
-    LoadScores --> CalcAvg[Calculate Averages<br/>+ Variance]
-    CalcAvg --> Rank[Assign Rankings<br/>Sort by avg score]
-    Rank --> GenResults[Generate results.md<br/>+ ranking.json]
-    GenResults --> Done([Complete])
-
-    style Start fill:#e1f5ff
-    style Review fill:#e1f5ff
-    style Agg fill:#e1f5ff
-    style Done fill:#c8e6c9
-    style D1 fill:#fff9c4
-    style D2 fill:#fff9c4
-    style R1 fill:#ffe0b2
-    style R2 fill:#ffe0b2
-```
+| `design_agent_temperature` | `number`   | `0.7`              | Reserved for future use                                                   |
+| `review_agent_temperature` | `number`   | `0.1`              | Reserved for future use                                                   |
+| `topic_generator_model`    | `string`   | First design model | Reserved for future use                                                   |
 
 ## Usage
 
-### 1. Generate Designs
+### 1. Ask the primary agent to generate designs
+
+Use the `designer` agent. Example prompt:
 
 ```
-Use the generate_designs tool with requirements:
-"Design a real-time collaborative document editor with conflict resolution,
-supporting rich text editing, multiple cursors, and offline mode."
+Ask all designer_model subagents to design a deepwiki clone. Output each design
+as a Markdown file with the model name as the filename.
 ```
 
-This will:
+The primary agent will:
 
-- Create a directory `.design-lab/YYYY-MM-DD-{topic}/`
-- Generate independent designs from each configured model
-- Save designs as JSON in `designs/` directory
-- Validate all designs against the schema
+- Create a run directory under `.design-lab/YYYY-MM-DD-topic/`
+- Delegate design generation to each `designer_model_*` subagent
+- Save designs to `designs/*.md`
 
-**Output:**
+### 2. Ask for cross-reviews
 
-```
-Design generation complete.
-
-Lab Directory: .design-lab/2026-01-22-collaborative-editor/
-
-Results: 3 successful, 0 failed
-
-✅ claude-sonnet-4: Generated successfully
-✅ gpt-4o: Generated successfully
-✅ gemini-3-pro: Generated successfully
-
-Next step: Run the review_designs tool to evaluate and compare the designs.
-```
-
-### 2. Review Designs
+Use the same `designer` agent to trigger reviews:
 
 ```
-Use the review_designs tool
+Now ask the same set of models to review all designs. Each reviewer outputs one
+Markdown report comparing all designs at once.
 ```
 
-This will:
-
-- Load all generated designs
-- Send them to each review model
-- Generate markdown reviews comparing all designs
-- Extract structured scores (0-10) across dimensions:
-  - Clarity
-  - Feasibility
-  - Scalability
-  - Maintainability
-  - Completeness
-  - Overall
-
-**Output:**
-
-```
-Review complete.
-
-Lab Directory: .design-lab/2026-01-22-collaborative-editor/
-
-Results: 2 successful, 0 failed
-
-✅ claude-opus-4: Review generated
-✅ gpt-5-2: Review generated
-
-Reviews saved to: .design-lab/2026-01-22-collaborative-editor/reviews/
-Scores saved to: .design-lab/2026-01-22-collaborative-editor/scores/
-
-Next step: Run the aggregate_scores tool to generate final rankings.
-```
-
-### 3. Aggregate Scores
-
-```
-Use the aggregate_scores tool
-```
-
-This will:
-
-- Parse all score files
-- Calculate average scores per design
-- Compute variance/disagreement metrics
-- Generate final rankings
-- Create `results.md` with comparative analysis
-
-**Output:**
-
-```
-Aggregation complete.
-
-Rankings saved to: .design-lab/2026-01-22-collaborative-editor/results/ranking.json
-Results summary saved to: .design-lab/2026-01-22-collaborative-editor/results/results.md
-
-Final Rankings
-
-1. **gpt-4o** - Score: 8.4/10 (variance: 0.32)
-2. **claude-sonnet-4** - Score: 8.1/10 (variance: 0.28)
-3. **gemini-3-pro** - Score: 7.8/10 (variance: 0.45)
-```
+Review files are saved to `reviews/review-*.md`.
 
 ## Output Structure
 
-Each design lab session creates a timestamped directory:
+Each run creates a timestamped directory:
 
 ```
-.design-lab/YYYY-MM-DD-{topic}/
-├── task.json                 # Original requirements and config
-├── designs/                  # Generated designs
-│   ├── claude-sonnet-4.json
-│   ├── gpt-4o.json
-│   └── gemini-3-pro.json
-├── reviews/                  # Markdown reviews
-│   ├── review-claude-opus-4.md
-│   └── review-gpt-5-2.md
-├── scores/                   # Structured scores
-│   ├── claude-sonnet-4-by-claude-opus-4.json
-│   ├── claude-sonnet-4-by-gpt-5-2.json
-│   ├── gpt-4o-by-claude-opus-4.json
-│   └── ...
-└── results/                  # Final aggregation
-    ├── ranking.json          # Numeric rankings
-    └── results.md            # Human-readable summary
+.design-lab/YYYY-MM-DD-topic/
+├── designs/
+│   ├── claude-sonnet-4.md
+│   ├── gpt-4o.md
+│   └── gemini-3-pro.md
+└── reviews/
+    ├── review-claude-opus-4.md
+    └── review-gpt-5-2.md
 ```
-
-## Design Artifact Schema
-
-Each design must conform to this structure:
-
-```typescript
-{
-  title: string;
-  summary: string;
-  assumptions: string[];
-  architecture_overview: string;
-  components: Array<{
-    name: string;
-    description: string;
-    responsibilities: string[];
-  }>;
-  data_flow: string;
-  tradeoffs: Array<{
-    aspect: string;
-    options: string[];
-    chosen: string;
-    rationale: string;
-  }>;
-  risks: Array<{
-    risk: string;
-    impact: "low" | "medium" | "high";
-    mitigation: string;
-  }>;
-  open_questions: string[];
-}
-```
-
-## Score Schema
-
-Reviewers produce scores following this structure:
-
-```typescript
-{
-  design_id: string;
-  reviewer_model: string;
-  scores: {
-    clarity: number;         // 0-10
-    feasibility: number;     // 0-10
-    scalability: number;     // 0-10
-    maintainability: number; // 0-10
-    completeness: number;    // 0-10
-    overall: number;         // 0-10
-  };
-  justification: string;
-  strengths: string[];
-  weaknesses: string[];
-  missing_considerations: string[];
-}
-```
-
-## How It Works
-
-### Multi-Agent Architecture
-
-Based on patterns from [oh-my-opencode](https://github.com/code-yeongyu/oh-my-opencode), each agent runs in its own OpenCode session:
-
-1. **Create Session**: `ctx.client.session.create({ ... })`
-2. **Send Prompt**: `ctx.client.session.prompt({ agent: model, ... })`
-3. **Poll Completion**: Check `session.status()` until idle
-4. **Extract Output**: Parse `session.messages()` for JSON
-
-### Sequential Execution
-
-Design Lab v1 runs agents **sequentially** (one after another) rather than in parallel. This:
-
-- Simplifies implementation
-- Avoids overwhelming the session manager
-- Still provides multiple independent perspectives
-
-### Schema Validation
-
-All outputs are validated using Zod schemas:
-
-- Design artifacts validated before saving
-- Scores validated during review
-- JSON schemas auto-generated via `z.toJSONSchema()` (Zod v4)
 
 ## Development
 
-### Build
-
 ```bash
+# Build the plugin (outputs to .opencode/plugins/design-lab.js)
 bun run build
+
+# Development with watch mode
+bun run dev
+
+# Run tests (vitest)
+bun run test
+
+# Format code with prettier
+bun run format
+
+# Type checking
+bun run typecheck
 ```
-
-Output: `.opencode/plugins/design-lab.js`
-
-### Generate JSON Schemas
-
-```bash
-bun src/utils/schema-export.ts
-```
-
-Output: `schemas/*.schema.json`
-
-### Project Structure
-
-```
-src/
-├── design-lab.ts           # Plugin entry point
-├── agents/
-│   └── index.ts            # Agent factory functions
-├── config/
-│   ├── schema.ts           # Zod schemas
-│   ├── loader.ts           # Config loading
-│   └── index.ts
-├── tools/
-│   ├── generate-designs.ts # Design generation orchestrator
-│   ├── review-designs.ts   # Review orchestrator
-│   ├── aggregate-scores.ts # Score aggregation
-│   └── index.ts
-└── utils/
-    ├── session-helpers.ts  # OpenCode session utilities
-    └── schema-export.ts    # Schema generator
-```
-
-## Examples
-
-### Example: API Gateway Design
-
-```
-Use generate_designs with requirements:
-"Design a high-performance API gateway for microservices.
-Must support:
-- Rate limiting and throttling
-- Authentication and authorization
-- Request/response transformation
-- Service discovery
-- Circuit breaking
-- Monitoring and observability
-Target: 100,000+ requests/second
-Constraints: Cloud-native, Kubernetes deployment"
-```
-
-### Example: Deepwiki Clone
-
-```
-Use generate_designs with requirements:
-"Design a DeepWiki clone - a service that indexes GitHub repositories
-and provides AI-powered search and Q&A over the codebase.
-Must support:
-- Repository indexing and updates
-- Vector search over code
-- Multi-language support
-- Usage tracking and analytics
-- API rate limiting
-Constraints: Open source, self-hostable"
-```
-
-## Design Philosophy
-
-> The goal is not simply to pick the "best" design, but to extract the best practices and insights from each model's design, then merge them into a superior composite design. Each model contributes unique strengths that can be combined to create a more robust solution.
-
-- **Multiple Perspectives**: Different models bring different strengths
-- **Structured Comparison**: Objective scoring across consistent dimensions
-- **Reproducible Process**: Same inputs → same structure (within model variance)
-- **Design as Artifact**: Not a conversation, but a versioned document
-
-## Roadmap (Future)
-
-- [ ] Background execution with progress notifications
-- [ ] Iterative refinement loops
-- [ ] Pairwise ranking (Elo-style)
-- [ ] Human-in-the-loop scoring
-- [ ] Design isolation hook (prevent agents reading other designs)
-- [ ] Visualization dashboard
-- [ ] Design merging/synthesis tool
-
-## Contributing
-
-Contributions welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-## License
-
-MIT
-
-## References
-
-- [OpenCode](https://github.com/sst/opencode) - The extensible AI coding assistant
-- [oh-my-opencode](https://github.com/code-yeongyu/oh-my-opencode) - Multi-agent patterns
-- [PRD.md](PRD.md) - Full requirements specification

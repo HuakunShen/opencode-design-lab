@@ -1,5 +1,220 @@
 import type { AgentConfig } from "@opencode-ai/sdk";
 
+import { getModelShortName } from "../utils/session-helpers";
+
+const DESIGNER_SUBAGENT_PREFIX = "designer_model_";
+
+type DesignerModelSpec = {
+  model: string;
+  agentName: string;
+  fileStem: string;
+};
+
+type DesignerPrimaryAgentOptions = {
+  baseOutputDir: string;
+  designModels: DesignerModelSpec[];
+  reviewModels: DesignerModelSpec[];
+};
+
+/**
+ * Build the agent name for a designer subagent model.
+ */
+export function getDesignerSubagentName(model: string): string {
+  return `${DESIGNER_SUBAGENT_PREFIX}${normalizeAgentSuffix(model)}`;
+}
+
+/**
+ * Build the file stem used for design and review markdown files.
+ */
+export function getDesignerModelFileStem(model: string): string {
+  return normalizeModelSlug(model);
+}
+
+/**
+ * Create the primary designer agent configuration.
+ */
+export function createDesignerPrimaryAgent(
+  options: DesignerPrimaryAgentOptions,
+): AgentConfig {
+  const primaryModel =
+    options.designModels[0]?.model ?? options.reviewModels[0]?.model;
+
+  return {
+    description: "Design Lab coordinator that orchestrates model subagents.",
+    mode: "primary",
+    model: primaryModel,
+    prompt: buildDesignerPrimaryPrompt(options),
+    tools: {
+      read: true,
+      bash: true,
+      delegate_task: true,
+      edit: false,
+      task: false,
+      write: false,
+    },
+    permission: {
+      bash: "allow",
+      edit: "deny",
+      webfetch: "deny",
+    },
+  } as AgentConfig;
+}
+
+/**
+ * Create a designer subagent configuration for a specific model.
+ */
+export function createDesignerModelAgent(model: string): AgentConfig {
+  return {
+    description: "Design Lab subagent that writes designs or reviews to files.",
+    mode: "subagent",
+    model,
+    prompt: buildDesignerSubagentPrompt(model),
+    tools: {
+      read: true,
+      write: true,
+      edit: false,
+      bash: false,
+      task: false,
+      delegate_task: false,
+    },
+    permission: {
+      bash: "deny",
+      edit: "allow",
+      webfetch: "deny",
+    },
+  } as AgentConfig;
+}
+
+function buildDesignerPrimaryPrompt(
+  options: DesignerPrimaryAgentOptions,
+): string {
+  const designList = options.designModels
+    .map(
+      (spec) =>
+        `- ${spec.agentName} (model: ${spec.model}, file: ${spec.fileStem}.md)`,
+    )
+    .join("\n");
+  const reviewList = options.reviewModels
+    .map(
+      (spec) =>
+        `- ${spec.agentName} (model: ${spec.model}, file: review-${spec.fileStem}.md)`,
+    )
+    .join("\n");
+
+  return `You are the Design Lab primary agent. Your job is to orchestrate model subagents to produce design and review markdown files.
+
+## Available subagents
+
+Design subagents:
+${designList}
+
+Review subagents:
+${reviewList}
+
+## Workflow
+
+1. Create a new run directory under "${options.baseOutputDir}" using the format:
+   ${options.baseOutputDir}/YYYY-MM-DD-topic/
+   Use a short, lowercase, hyphenated topic derived from the request.
+   Use bash for date generation (e.g., "date +%F") and directory creation.
+2. Create subdirectories:
+   - designs/
+   - reviews/
+3. For each design subagent, delegate a design task sequentially:
+   - Provide the requirements and the exact output_file path:
+     ${options.baseOutputDir}/YYYY-MM-DD-topic/designs/{fileStem}.md
+   - The output_file path is mandatory. If you omit it, the subagent must fail.
+   - Instruct the subagent to write ONLY to the file and NOT to output the design in chat.
+4. After all designs are written, delegate review tasks sequentially:
+   - Provide the list of design file paths.
+   - Provide the exact output_file path:
+     ${options.baseOutputDir}/YYYY-MM-DD-topic/reviews/review-{fileStem}.md
+   - Each reviewer must produce ONE markdown report comparing ALL designs at once.
+5. After all reviews are written, read every review file and produce a short summary:
+   - Which design is recommended overall
+   - Approximate scores per design (from the score table)
+   - Notable disagreements between reviewers
+
+## Output rules
+
+- Never paste design or review content into the main chat.
+- Return only a concise summary with the run directory, file paths, and the review summary.
+- If asked "what agents will you call", list the design subagents by name.
+- If the user asks for parallel execution, explain that you run sequentially for stability.
+- Use only the subagents listed above; do not invent agent names.`;
+}
+
+function buildDesignerSubagentPrompt(model: string): string {
+  return `You are a Design Lab subagent for model: ${model}.
+
+You only take tasks from the primary designer agent. You must write outputs to files and keep chat responses minimal.
+
+## Global rules
+
+- Use only read and write tools when needed.
+- NEVER output the design or review content in chat.
+- ALWAYS write to the exact output_file path provided.
+- If output_file is missing or unclear, reply with: "FAILED: missing output_file".
+- After writing, reply with: "WROTE: <output_file>".
+- If you cannot complete the task, reply with: "FAILED: <reason>".
+
+## Design tasks
+
+When asked to design:
+- Produce a concise but complete Markdown design document.
+- Use these sections (in this order): Title, Summary, Goals, Non-Goals, Architecture, Components, Data Flow, Tradeoffs, Risks, Open Questions.
+- Write the design to the provided output_file.
+
+## Review tasks
+
+When asked to review:
+- Read all provided design files.
+- Produce ONE Markdown report that compares all designs at once.
+- Use the fixed scoring standard below for ALL reviews.
+- Include sections in this exact order:
+  1. Executive Summary
+  2. Comparison Table
+  3. Strengths
+  4. Weaknesses
+  5. Recommendation
+  6. Open Questions
+  7. Scoring Standard
+- At the very bottom, include a Scores Table that rates EACH design.
+- Write the report to the provided output_file.
+
+## Fixed Scoring Standard
+
+- Scale: 0-10 for each criterion (10 is best).
+- Criteria and weights (total 100%):
+  - Clarity: 20%
+  - Feasibility: 25%
+  - Scalability: 20%
+  - Maintainability: 20%
+  - Completeness: 15%
+- Weighted Total (0-10) = sum(score * weight) / 100.
+
+## Scores Table Format (must be last in the report)
+
+| Design | Clarity (20%) | Feasibility (25%) | Scalability (20%) | Maintainability (20%) | Completeness (15%) | Weighted Total (0-10) |
+|--------|---------------|-------------------|-------------------|-----------------------|--------------------|-----------------------|
+| model-a | 8 | 9 | 7 | 8 | 8 | 8.1 |`;
+}
+
+function normalizeModelSlug(model: string): string {
+  const shortName = getModelShortName(model);
+  return shortName
+    .toLowerCase()
+    .replace(/\//g, "-")
+    .replace(/[._\s]+/g, "-")
+    .replace(/[^a-z0-9-]/g, "")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function normalizeAgentSuffix(model: string): string {
+  return normalizeModelSlug(model).replace(/-/g, "");
+}
+
 /**
  * System prompt for design generation agents
  */
