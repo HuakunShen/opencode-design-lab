@@ -19,6 +19,10 @@ import { logger } from "./utils/logger";
 export const DesignLab: Plugin = async (ctx) => {
   // Load configuration
   const pluginConfig = loadPluginConfig(ctx.directory);
+  if (!pluginConfig) {
+    logger.warn("DesignLab disabled due to missing or invalid config");
+    return {};
+  }
   logger.info("Design Lab Plugin Loaded");
 
   return {

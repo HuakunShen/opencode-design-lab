@@ -1,6 +1,7 @@
+import { logger } from "../utils/logger";
 import * as fs from "fs";
-import * as path from "path";
 import * as os from "os";
+import * as path from "path";
 import { DesignLabConfigSchema, type DesignLabConfig } from "./schema";
 
 /**
@@ -48,42 +49,55 @@ function parseJsonc<T>(content: string): T {
 /**
  * Load config from a specific path if it exists
  */
-function loadConfigFromPath(
-  configPath: string,
-): Partial<DesignLabConfig> | null {
-  try {
-    // Support both .json and .jsonc extensions
-    const possiblePaths = [
-      configPath,
-      `${configPath}.json`,
-      `${configPath}.jsonc`,
-    ];
+type ConfigLoadResult = {
+  config: Partial<DesignLabConfig> | null;
+  loadedPath?: string;
+  error?: string;
+};
 
-    for (const fullPath of possiblePaths) {
-      if (fs.existsSync(fullPath)) {
-        const content = fs.readFileSync(fullPath, "utf-8");
-        const rawConfig = parseJsonc<Record<string, unknown>>(content);
+function loadConfigFromPath(configPath: string): ConfigLoadResult {
+  // Support both .json and .jsonc extensions
+  const possiblePaths = [
+    configPath,
+    `${configPath}.json`,
+    `${configPath}.jsonc`,
+  ];
 
-        // Parse with Zod but allow partial configs
-        const result = DesignLabConfigSchema.partial().safeParse(rawConfig);
-
-        if (!result.success) {
-          console.error(
-            `Config validation error in ${fullPath}:`,
-            result.error.issues,
-          );
-          return null;
-        }
-
-        return result.data;
-      }
+  for (const fullPath of possiblePaths) {
+    if (!fs.existsSync(fullPath)) {
+      continue;
     }
-  } catch (err) {
-    const errorMsg = err instanceof Error ? err.message : String(err);
-    console.error(`Error loading config from ${configPath}:`, errorMsg);
+
+    try {
+      const content = fs.readFileSync(fullPath, "utf-8");
+      const rawConfig = parseJsonc<Record<string, unknown>>(content);
+
+      // Parse with Zod but allow partial configs
+      const result = DesignLabConfigSchema.partial().safeParse(rawConfig);
+
+      if (!result.success) {
+        const issues = result.error.issues
+          .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
+          .join(", ");
+        return {
+          config: null,
+          loadedPath: fullPath,
+          error: `Config validation error: ${issues}`,
+        };
+      }
+
+      return { config: result.data, loadedPath: fullPath };
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      return {
+        config: null,
+        loadedPath: fullPath,
+        error: `Error loading config: ${errorMsg}`,
+      };
+    }
   }
 
-  return null;
+  return { config: null };
 }
 
 /**
@@ -108,7 +122,7 @@ function getUserConfigDir(): string {
  * @param directory - Project directory
  * @returns Merged and validated configuration
  */
-export function loadPluginConfig(directory: string): DesignLabConfig {
+export function loadPluginConfig(directory: string): DesignLabConfig | null {
   // User-level config path
   const userConfigPath = path.join(
     getUserConfigDir(),
@@ -120,29 +134,68 @@ export function loadPluginConfig(directory: string): DesignLabConfig {
   const projectConfigPath = path.join(directory, ".opencode", "design-lab");
 
   // Load configs
-  const userConfig = loadConfigFromPath(userConfigPath);
-  const projectConfig = loadConfigFromPath(projectConfigPath);
+  const userConfigResult = loadConfigFromPath(userConfigPath);
+  const projectConfigResult = loadConfigFromPath(projectConfigPath);
+
+  if (userConfigResult.error || projectConfigResult.error) {
+    logger.error(
+      {
+        userConfigPath: userConfigResult.loadedPath,
+        userConfigError: userConfigResult.error,
+        projectConfigPath: projectConfigResult.loadedPath,
+        projectConfigError: projectConfigResult.error,
+      },
+      "DesignLab config invalid; plugin disabled",
+    );
+    return null;
+  }
+
+  if (userConfigResult.loadedPath) {
+    logger.info(
+      { configPath: userConfigResult.loadedPath },
+      "Loaded DesignLab user config",
+    );
+  }
+  if (projectConfigResult.loadedPath) {
+    logger.info(
+      { configPath: projectConfigResult.loadedPath },
+      "Loaded DesignLab project config",
+    );
+  }
+
+  if (!userConfigResult.config && !projectConfigResult.config) {
+    logger.warn(
+      { userConfigPath, projectConfigPath },
+      "DesignLab config not found; plugin disabled",
+    );
+    return null;
+  }
 
   // Merge configs (project overrides user)
   let mergedConfig: Partial<DesignLabConfig> = {};
 
-  if (userConfig) {
-    mergedConfig = deepMerge(mergedConfig, userConfig);
+  if (userConfigResult.config) {
+    mergedConfig = deepMerge(mergedConfig, userConfigResult.config);
   }
 
-  if (projectConfig) {
-    mergedConfig = deepMerge(mergedConfig, projectConfig);
+  if (projectConfigResult.config) {
+    mergedConfig = deepMerge(mergedConfig, projectConfigResult.config);
   }
 
   // Parse and validate final config with defaults
   const result = DesignLabConfigSchema.safeParse(mergedConfig);
 
   if (!result.success) {
-    throw new Error(
-      `Invalid design-lab configuration: ${result.error.issues
-        .map((i) => `${i.path.join(".")}: ${i.message}`)
-        .join(", ")}`,
+    logger.error(
+      {
+        issues: result.error.issues.map((issue) => ({
+          path: issue.path.join("."),
+          message: issue.message,
+        })),
+      },
+      "Invalid design-lab configuration; plugin disabled",
     );
+    return null;
   }
 
   return result.data;
