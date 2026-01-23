@@ -1,7 +1,7 @@
 import { defineConfig } from "tsdown";
 
 export default defineConfig({
-  exports: true,
+  exports: false,
   dts: false,
   fixedExtension: false,
   outDir: ".opencode/plugins",
