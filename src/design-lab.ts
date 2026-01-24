@@ -7,6 +7,7 @@ import {
   getDesignerModelFileStem,
   getDesignerSubagentName,
 } from "./agents";
+import { buildDesignCommand, buildReviewCommand } from "./commands";
 import { loadPluginConfig } from "./config";
 import { logger } from "./utils/logger";
 
@@ -66,14 +67,30 @@ export const DesignLab: Plugin = async (ctx) => {
         ...Object.fromEntries(subagentEntries),
       };
 
+      config.command = {
+        ...(config.command ?? {}),
+        "design-lab:design": buildDesignCommand({
+          baseOutputDir: pluginConfig.base_output_dir,
+          designModels: designSpecs,
+          reviewModels: reviewSpecs,
+        }),
+        "design-lab:review": buildReviewCommand({
+          baseOutputDir: pluginConfig.base_output_dir,
+          designModels: designSpecs,
+          reviewModels: reviewSpecs,
+        }),
+      };
+
       const agentKeys = Object.keys(config.agent ?? {});
+      const commandKeys = Object.keys(config.command ?? {});
       logger.info(
         {
           designModels,
           reviewModels,
           agentsRegistered: agentKeys,
+          commandsRegistered: commandKeys,
         },
-        "DesignLab agents registered",
+        "DesignLab agents and commands registered",
       );
     },
   };
