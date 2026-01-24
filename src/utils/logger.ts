@@ -1,6 +1,7 @@
 import pino from "pino";
 import * as path from "path";
 import * as fs from "fs";
+import * as os from "os";
 
 const logLevel = process.env.LOG_LEVEL || "info";
 
@@ -22,8 +23,34 @@ function formatTimestamp(): string {
   return `${hours}:${minutes}:${seconds}.${ms}`;
 }
 
+/**
+ * Get the global config directory for logs (cross-platform)
+ */
+function getLogDirectory(): string {
+  let configDir: string;
+
+  if (process.platform === "win32") {
+    configDir =
+      process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming");
+  } else {
+    // macOS and Linux both use ~/.config
+    configDir =
+      process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config");
+  }
+
+  const logDir = path.join(configDir, "opencode");
+
+  // Ensure directory exists
+  if (!fs.existsSync(logDir)) {
+    fs.mkdirSync(logDir, { recursive: true });
+  }
+
+  return logDir;
+}
+
 function createLogStream() {
-  const logPath = path.join(process.cwd(), "design-lab.log");
+  const logDir = getLogDirectory();
+  const logPath = path.join(logDir, "design-lab.log");
   const stream = fs.createWriteStream(logPath, { flags: "a" });
 
   return pino.multistream([
