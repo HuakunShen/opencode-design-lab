@@ -91,10 +91,11 @@ $input
 1. Create a run directory: ${options.baseOutputDir}/YYYY-MM-DD-<topic-slug>/
    Use today's date and a short hyphenated slug derived from the topic.
 2. Create subdirectory: designs/
-3. Delegate design generation to each subagent sequentially:
+3. Delegate design generation to each subagent in parallel:
 ${designList}
-4. Each subagent must write its design to the specified output_file path.
-5. After all designs are written, report the run directory and list of generated files.
+4. Fire all delegate_task calls simultaneously - do NOT wait for each to complete before starting the next.
+5. Each subagent must write its design to the specified output_file path.
+6. Wait for ALL subagents to complete, then report the run directory and list of generated files.
 
 Do NOT run reviews. Only generate designs.`,
   };
@@ -126,11 +127,12 @@ $input
    recent run directory under ${options.baseOutputDir}/ (sort by date prefix).
 2. Read all design files from the designs/ subdirectory.
 3. Create subdirectory: reviews/ (if it doesn't exist).
-4. Delegate review tasks to each review subagent sequentially:
+4. Delegate review tasks to each review subagent in parallel:
 ${reviewList}
-5. Each reviewer must read ALL designs and produce ONE comparative markdown
+5. Fire all delegate_task calls simultaneously - do NOT wait for each to complete before starting the next.
+6. Each reviewer must read ALL designs and produce ONE comparative markdown
    report written to its output_file path.
-6. After all reviews are written, read them and produce a summary:
+7. Wait for ALL review subagents to complete, then read the reviews and produce a summary:
    - Which design is recommended overall
    - Approximate scores per design
    - Notable disagreements between reviewers`,

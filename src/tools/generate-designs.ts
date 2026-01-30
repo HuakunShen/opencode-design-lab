@@ -100,14 +100,8 @@ Use this when you want to explore multiple approaches to a design problem and co
         JSON.stringify(taskData, null, 2),
       );
 
-      // Generate designs from each model
-      const results: Array<{
-        model: string;
-        success: boolean;
-        error?: string;
-      }> = [];
-
-      for (const model of config.design_models) {
+      // Generate designs from each model in parallel
+      const designPromises = config.design_models.map(async (model) => {
         try {
           logger.info(
             { model },
@@ -129,14 +123,13 @@ Use this when you want to explore multiple approaches to a design problem and co
               { model, errors: validationResult.error.issues },
               "Design schema validation failed",
             );
-            results.push({
+            return {
               model,
               success: false,
               error: `Schema validation failed: ${validationResult.error.issues
                 .map((i) => `${i.path.join(".")}: ${i.message}`)
                 .join(", ")}`,
-            });
-            continue;
+            };
           }
 
           // Save design as JSON
@@ -160,13 +153,29 @@ Use this when you want to explore multiple approaches to a design problem and co
           fs.writeFileSync(markdownFile, markdown);
           logger.info({ model, markdownFile }, "Design saved as Markdown");
 
-          results.push({ model, success: true });
+          return { model, success: true };
         } catch (err) {
           const errorMsg = err instanceof Error ? err.message : String(err);
           logger.error({ model, error: errorMsg }, "Design generation failed");
-          results.push({ model, success: false, error: errorMsg });
+          return { model, success: false, error: errorMsg };
         }
-      }
+      });
+
+      // Run all design generations in parallel
+      const settledResults = await Promise.allSettled(designPromises);
+
+      // Process results
+      const results: Array<{
+        model: string;
+        success: boolean;
+        error?: string;
+      }> = settledResults.map((result) => {
+        if (result.status === "fulfilled") {
+          return result.value;
+        } else {
+          return { model: "unknown", success: false, error: result.reason };
+        }
+      });
 
       const successCount = results.filter((r) => r.success).length;
       const failCount = results.filter((r) => !r.success).length;

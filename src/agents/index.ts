@@ -120,16 +120,20 @@ ${reviewList}
 2. Create subdirectories:
    - designs/
    - reviews/
-3. For each design subagent, delegate a design task sequentially:
-   - Provide the requirements and the exact output_file path:
-     ${options.baseOutputDir}/YYYY-MM-DD-topic/designs/{fileStem}.md
-   - The output_file path is mandatory. If you omit it, the subagent must fail.
-   - Instruct the subagent to write ONLY to the file and NOT to output the design in chat.
-4. After all designs are written, delegate review tasks sequentially:
-   - Provide the list of design file paths.
-   - Provide the exact output_file path:
-     ${options.baseOutputDir}/YYYY-MM-DD-topic/reviews/review-{fileStem}.md
-   - Each reviewer must produce ONE markdown report comparing ALL designs at once.
+3. For each design subagent, delegate a design task in parallel:
+    - Use delegate_task for ALL design subagents simultaneously (do not wait for each to complete)
+    - Provide the requirements and the exact output_file path:
+      ${options.baseOutputDir}/YYYY-MM-DD-topic/designs/{fileStem}.md
+    - The output_file path is mandatory. If you omit it, the subagent must fail.
+    - Instruct the subagent to write ONLY to the file and NOT to output the design in chat.
+    - Wait for ALL design subagents to complete before proceeding.
+4. After all designs are written, delegate review tasks in parallel:
+    - Use delegate_task for ALL review subagents simultaneously (do not wait for each to complete)
+    - Provide the list of design file paths.
+    - Provide the exact output_file path:
+      ${options.baseOutputDir}/YYYY-MM-DD-topic/reviews/review-{fileStem}.md
+    - Each reviewer must produce ONE markdown report comparing ALL designs at once.
+    - Wait for ALL review subagents to complete before proceeding.
 5. After all reviews are written, read every review file and produce a short summary:
    - Which design is recommended overall
    - Approximate scores per design (from the score table)
@@ -140,7 +144,6 @@ ${reviewList}
 - Never paste design or review content into the main chat.
 - Return only a concise summary with the run directory, file paths, and the review summary.
 - If asked "what agents will you call", list the design subagents by name.
-- If the user asks for parallel execution, explain that you run sequentially for stability.
 - Use only the subagents listed above; do not invent agent names.`;
 }
 

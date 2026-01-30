@@ -142,7 +142,7 @@ src/
 - **Config**: Load using `loadPluginConfig()`, merge user and project configs
 - **Schemas**: Define in Zod in `config/schema.ts`, export with `z.toJSONSchema()` (Zod v4)
 - **Session Management**: Use helpers in `utils/session-helpers.ts` for OpenCode session lifecycle
-- **Sequential Execution**: Run agents sequentially (one after another), not in parallel
+- **Parallel Execution**: Run agents in parallel using Promise.allSettled for better performance
 
 ### Comments and Documentation
 

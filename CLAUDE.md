@@ -40,11 +40,11 @@ bun run export-schemas
 
 The plugin uses a **hierarchical agent system**:
 
-1. **Primary Agent (`designer`)**: Orchestrates the entire workflow, creates run directories, and delegates tasks sequentially to subagents
+1. **Primary Agent (`designer`)**: Orchestrates the entire workflow, creates run directories, and delegates tasks in parallel to subagents
 2. **Designer Subagents (`designer_model_*`)**: One per configured model. Each writes design proposals to `designs/{model}.md`
 3. **Review Subagents**: Same set of models. Each writes cross-reviews to `reviews/review-{model}.md`
 
-**Critical constraint**: Subagents run **sequentially** (one at a time), never in parallel. This ensures stability and deterministic results.
+**Performance optimization**: Subagents run **in parallel** (all at once) using Promise.allSettled. This provides ~N× speedup with N models while maintaining stability.
 
 ### Dynamic Model Registration
 
@@ -201,7 +201,7 @@ All reviewers must include a score table at the bottom of their review markdown.
 
 ## Important Constraints
 
-1. **Sequential execution only**: Never run subagents in parallel. The primary agent prompt explicitly enforces this.
+1. **Parallel execution**: Subagents run in parallel using Promise.allSettled. The primary agent prompt instructs simultaneous delegation.
 2. **Mandatory output_file**: Subagents must receive exact file paths. If missing, they must fail.
 3. **Model name normalization**: Always use `getModelShortName()` + normalization for consistency.
 4. **No chat bloat**: Never paste full designs/reviews into chat context.

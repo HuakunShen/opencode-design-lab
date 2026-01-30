@@ -25,7 +25,7 @@ primary agent does not need to ingest large artifacts into the chat context.
 - **Dynamic model registration**: Subagents are created from config at startup
 - **Correct model usage**: Each subagent is bound to its configured model
 - **File-first outputs**: Designs and reviews are written to disk, not chat
-- **Sequential orchestration**: Subagents run one at a time for stability
+- **Parallel orchestration**: Subagents run simultaneously for performance (~N× speedup with N models)
 - **Cross-review**: The same model set reviews all designs in a single report
 
 ## Core Principles
@@ -45,10 +45,10 @@ only returns file paths and summaries, minimizing context usage.
 Each design subagent works independently. It never sees other designs unless
 explicitly asked to review them.
 
-### 4. Sequential Delegation
+### 4. Parallel Delegation
 
-Subagents run sequentially to avoid session conflicts and ensure deterministic
-ordering.
+Subagents run in parallel using Promise.allSettled for maximum performance.
+Each subagent is independent and writes to its own file, eliminating conflicts.
 
 ## Architecture
 

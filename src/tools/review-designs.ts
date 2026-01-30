@@ -84,14 +84,8 @@ Use this after generate_designs to evaluate and compare the generated designs.`,
       const taskData = JSON.parse(fs.readFileSync(taskPath, "utf-8"));
       const requirements = taskData.requirements;
 
-      // Run reviews
-      const results: Array<{
-        model: string;
-        success: boolean;
-        error?: string;
-      }> = [];
-
-      for (const model of reviewModels) {
+      // Run reviews in parallel
+      const reviewPromises = reviewModels.map(async (model) => {
         try {
           const { review, scores } = await generateReview(
             ctx,
@@ -114,9 +108,9 @@ Use this after generate_designs to evaluate and compare the generated designs.`,
           for (const score of scores) {
             const validationResult = ScoreSchema.safeParse(score);
             if (!validationResult.success) {
-              console.warn(
-                `Score validation warning for ${score.design_id}:`,
-                validationResult.error,
+              logger.warn(
+                { designId: score.design_id, errors: validationResult.error.issues },
+                "Score validation warning"
               );
             }
 
@@ -129,12 +123,28 @@ Use this after generate_designs to evaluate and compare the generated designs.`,
             fs.writeFileSync(scoreFile, JSON.stringify(score, null, 2));
           }
 
-          results.push({ model, success: true });
+          return { model, success: true };
         } catch (err) {
           const errorMsg = err instanceof Error ? err.message : String(err);
-          results.push({ model, success: false, error: errorMsg });
+          return { model, success: false, error: errorMsg };
         }
-      }
+      });
+
+      // Run all reviews in parallel
+      const settledResults = await Promise.allSettled(reviewPromises);
+
+      // Process results
+      const results: Array<{
+        model: string;
+        success: boolean;
+        error?: string;
+      }> = settledResults.map((result) => {
+        if (result.status === "fulfilled") {
+          return result.value;
+        } else {
+          return { model: "unknown", success: false, error: result.reason };
+        }
+      });
 
       const successCount = results.filter((r) => r.success).length;
       const failCount = results.filter((r) => !r.success).length;
