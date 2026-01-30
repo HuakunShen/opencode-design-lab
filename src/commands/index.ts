@@ -19,6 +19,54 @@ type CommandConfig = {
 };
 
 /**
+ * Build the `/init` command configuration.
+ *
+ * Usage: /design-lab:init
+ * Initializes a new design-lab.json config file in the project's .opencode directory
+ * using the bundled template as a starting point.
+ */
+export function buildInitCommand(baseDir: string): CommandConfig {
+  return {
+    description:
+      "Initialize design-lab.json config in .opencode/ (creates from template)",
+    template: `Initialize the Design Lab configuration file.
+
+Create a new design-lab.json file at: ${baseDir}/.opencode/design-lab.json
+
+## Instructions
+
+1. Check if ${baseDir}/.opencode/design-lab.json already exists
+2. If it exists, report that the config already exists and show its path
+3. If it doesn't exist:
+   - Create the .opencode/ directory if it doesn't exist
+   - Copy the bundled template to ${baseDir}/.opencode/design-lab.json
+   - Report success and show the path to the created file
+
+Here is a template
+{
+  "design_models": [
+    "opencode/kimi-k2.5-free",
+    "zhipuai-coding-plan/glm-4.7",
+    "openai/gpt-5.2-codex",
+    "google/antigravity-gemini-3-pro",
+    "anthropic/claude-opus-4-5"
+  ],
+  "review_models": [
+    "opencode/kimi-k2.5-free",
+    "zhipuai-coding-plan/glm-4.7",
+    "openai/gpt-5.2-codex",
+    "google/antigravity-gemini-3-pro",
+    "anthropic/claude-opus-4-5"
+  ],
+  "base_output_dir": ".design-lab",
+  "design_agent_temperature": 0.7,
+  "review_agent_temperature": 0.1
+}
+`,
+  };
+}
+
+/**
  * Build the `/design` command configuration.
  *
  * Usage: /design <topic>
@@ -61,9 +109,7 @@ Do NOT run reviews. Only generate designs.`,
  */
 export function buildReviewCommand(options: CommandOptions): CommandConfig {
   const reviewList = options.reviewModels
-    .map(
-      (spec) => `- ${spec.agentName} → reviews/review-${spec.fileStem}.md`,
-    )
+    .map((spec) => `- ${spec.agentName} → reviews/review-${spec.fileStem}.md`)
     .join("\n");
 
   return {

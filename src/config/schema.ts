@@ -4,12 +4,14 @@ import { z } from "zod";
  * Configuration schema for OpenCode Design Lab plugin
  */
 export const DesignLabConfigSchema = z.object({
-  "$schema": z.string().optional(),
+  $schema: z.string().optional(),
   /**
    * List of models to use for design generation
    * Each model will generate one independent design
    */
-  design_models: z.array(z.string()).min(2, "At least 2 design models required"),
+  design_models: z
+    .array(z.string())
+    .min(2, "At least 2 design models required"),
 
   /**
    * List of models to use for design review and scoring
@@ -59,7 +61,7 @@ export const DesignArtifactSchema = z.object({
       name: z.string(),
       description: z.string(),
       responsibilities: z.array(z.string()),
-    })
+    }),
   ),
   data_flow: z.string(),
   tradeoffs: z.array(
@@ -68,14 +70,14 @@ export const DesignArtifactSchema = z.object({
       options: z.array(z.string()),
       chosen: z.string(),
       rationale: z.string(),
-    })
+    }),
   ),
   risks: z.array(
     z.object({
       risk: z.string(),
       impact: z.enum(["low", "medium", "high"]),
       mitigation: z.string(),
-    })
+    }),
   ),
   open_questions: z.array(z.string()),
 });

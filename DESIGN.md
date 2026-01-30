@@ -200,7 +200,7 @@ The primary agent prompt encodes the orchestration contract:
 - Delegate review tasks to the review model list
 - Read all review files and summarize scores and recommendation
 
-### Subagent Prompt (designer_model_*)
+### Subagent Prompt (designer*model*\*)
 
 Each subagent prompt ensures file-first output:
 

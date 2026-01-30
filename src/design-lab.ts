@@ -7,7 +7,11 @@ import {
   getDesignerModelFileStem,
   getDesignerSubagentName,
 } from "./agents";
-import { buildDesignCommand, buildReviewCommand } from "./commands";
+import {
+  buildDesignCommand,
+  buildInitCommand,
+  buildReviewCommand,
+} from "./commands";
 import { loadPluginConfig } from "./config";
 import { logger } from "./utils/logger";
 
@@ -20,78 +24,95 @@ import { logger } from "./utils/logger";
 export const DesignLab: Plugin = async (ctx) => {
   // Load configuration
   const pluginConfig = loadPluginConfig(ctx.directory);
+
   if (!pluginConfig) {
-    logger.warn("DesignLab disabled due to missing or invalid config");
-    return {};
+    logger.warn(
+      "DesignLab config not found; only init command will be available",
+    );
+  } else {
+    logger.info("Design Lab Plugin Loaded");
   }
-  logger.info("Design Lab Plugin Loaded");
 
   return {
     config: async (config: Config) => {
-      const designModels = uniqueModels(pluginConfig.design_models);
-      const reviewModels = uniqueModels(
-        pluginConfig.review_models ?? pluginConfig.design_models,
-      );
-      const allModels = uniqueModels([...designModels, ...reviewModels]);
-
-      const modelSpecs = new Map(
-        allModels.map((model) => [
-          model,
-          {
-            model,
-            agentName: getDesignerSubagentName(model),
-            fileStem: getDesignerModelFileStem(model),
-          },
-        ]),
-      );
-
-      const designSpecs = designModels
-        .map((model) => modelSpecs.get(model))
-        .filter(isModelSpec);
-      const reviewSpecs = reviewModels
-        .map((model) => modelSpecs.get(model))
-        .filter(isModelSpec);
-
-      const subagentEntries = Array.from(modelSpecs.values()).map((spec) => [
-        spec.agentName,
-        createDesignerModelAgent(spec.model),
-      ]);
-
-      config.agent = {
-        ...(config.agent ?? {}),
-        designer: createDesignerPrimaryAgent({
-          baseOutputDir: pluginConfig.base_output_dir,
-          designModels: designSpecs,
-          reviewModels: reviewSpecs,
-        }),
-        ...Object.fromEntries(subagentEntries),
-      };
-
+      // Always register the init command (cannot be skipped)
       config.command = {
         ...(config.command ?? {}),
-        "design-lab:design": buildDesignCommand({
-          baseOutputDir: pluginConfig.base_output_dir,
-          designModels: designSpecs,
-          reviewModels: reviewSpecs,
-        }),
-        "design-lab:review": buildReviewCommand({
-          baseOutputDir: pluginConfig.base_output_dir,
-          designModels: designSpecs,
-          reviewModels: reviewSpecs,
-        }),
+        "design-lab:init": buildInitCommand(ctx.directory),
       };
 
-      const agentKeys = Object.keys(config.agent ?? {});
-      const commandKeys = Object.keys(config.command ?? {});
-      logger.info(
-        {
-          designModels,
-          reviewModels,
-          agentsRegistered: agentKeys,
-          commandsRegistered: commandKeys,
-        },
-        "DesignLab agents and commands registered",
-      );
+      // Only register agents and other commands if config exists
+      if (pluginConfig) {
+        const designModels = uniqueModels(pluginConfig.design_models);
+        const reviewModels = uniqueModels(
+          pluginConfig.review_models ?? pluginConfig.design_models,
+        );
+        const allModels = uniqueModels([...designModels, ...reviewModels]);
+
+        const modelSpecs = new Map(
+          allModels.map((model) => [
+            model,
+            {
+              model,
+              agentName: getDesignerSubagentName(model),
+              fileStem: getDesignerModelFileStem(model),
+            },
+          ]),
+        );
+
+        const designSpecs = designModels
+          .map((model) => modelSpecs.get(model))
+          .filter(isModelSpec);
+        const reviewSpecs = reviewModels
+          .map((model) => modelSpecs.get(model))
+          .filter(isModelSpec);
+
+        const subagentEntries = Array.from(modelSpecs.values()).map((spec) => [
+          spec.agentName,
+          createDesignerModelAgent(spec.model),
+        ]);
+
+        config.agent = {
+          ...(config.agent ?? {}),
+          designer: createDesignerPrimaryAgent({
+            baseOutputDir: pluginConfig.base_output_dir,
+            designModels: designSpecs,
+            reviewModels: reviewSpecs,
+          }),
+          ...Object.fromEntries(subagentEntries),
+        };
+
+        config.command = {
+          ...(config.command ?? {}),
+          "design-lab:design": buildDesignCommand({
+            baseOutputDir: pluginConfig.base_output_dir,
+            designModels: designSpecs,
+            reviewModels: reviewSpecs,
+          }),
+          "design-lab:review": buildReviewCommand({
+            baseOutputDir: pluginConfig.base_output_dir,
+            designModels: designSpecs,
+            reviewModels: reviewSpecs,
+          }),
+        };
+
+        const agentKeys = Object.keys(config.agent ?? {});
+        const commandKeys = Object.keys(config.command ?? {});
+        logger.info(
+          {
+            designModels,
+            reviewModels,
+            agentsRegistered: agentKeys,
+            commandsRegistered: commandKeys,
+          },
+          "DesignLab agents and commands registered",
+        );
+      } else {
+        logger.info(
+          { command: "design-lab:init" },
+          "DesignLab init command registered (config missing)",
+        );
+      }
     },
   };
 };

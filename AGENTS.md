@@ -41,6 +41,7 @@ bun run export-schemas
 - Keep imports sorted alphabetically within groups
 
 Example:
+
 ```typescript
 import type { Plugin } from "@opencode-ai/plugin";
 import { loadPluginConfig } from "./config";
@@ -79,6 +80,7 @@ import * as path from "path";
 - Throw `Error` objects (not strings) with clear messages
 
 Example:
+
 ```typescript
 try {
   const design = await generateDesign(...);
@@ -97,6 +99,7 @@ try {
 - Logs are written to `design-lab.log` in the current working directory
 
 Example:
+
 ```typescript
 logger.info({ model, sessionID }, "Starting design generation");
 logger.error({ error: createResult.error }, "Failed to create session");
@@ -171,6 +174,7 @@ src/
 - Use descriptive names that explain the value's purpose
 
 Example:
+
 ```typescript
 const POLL_INTERVAL_MS = 500;
 const MAX_POLL_TIME_MS = 10 * 60 * 1000; // 10 minutes

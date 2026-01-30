@@ -49,10 +49,12 @@ The plugin uses a **hierarchical agent system**:
 ### Dynamic Model Registration
 
 All agents are created dynamically from `design_models` and `review_models` in the config. Agent names follow the pattern:
+
 - Primary: `designer`
 - Subagents: `designer_model_{normalized_model_name}`
 
 Model names are normalized to file stems by:
+
 1. Getting short name via `getModelShortName()`
 2. Lowercasing and replacing separators with hyphens
 3. Removing invalid characters
@@ -63,12 +65,14 @@ Model names are normalized to file stems by:
 **Key principle**: Designs and reviews are written to disk, NOT to chat. This prevents context bloat and enables large-scale cross-model comparisons.
 
 The primary agent:
+
 - Creates timestamped run directories: `.design-lab/YYYY-MM-DD-topic/`
 - Provides exact `output_file` paths to each subagent
 - Reads completed files and summarizes results
 - Never pastes full content into chat
 
 Subagents:
+
 - Write to the exact `output_file` path provided
 - Return only `"WROTE: <path>"` or `"FAILED: <reason>"`
 - Never output design/review content in chat
@@ -122,7 +126,13 @@ Use utilities from `src/utils/session-helpers.ts`:
 
 ```typescript
 // Create session
-const session = await createAgentSession(client, parentID, title, cwd, agentKey);
+const session = await createAgentSession(
+  client,
+  parentID,
+  title,
+  cwd,
+  agentKey,
+);
 
 // Send prompt
 const sendResult = await sendPrompt(client, sessionID, userPrompt);
@@ -136,12 +146,14 @@ Sessions are managed by OpenCode. The plugin delegates via `delegate_task` tool,
 ### Agent Tool Permissions
 
 Primary agent (`designer`):
+
 - `read: true` (can read completed files)
 - `bash: true` (can create directories, run `date +%F`)
 - `delegate_task: true` (delegates to subagents)
 - `write/edit/task: false`
 
 Subagents (`designer_model_*`):
+
 - `read: true` (can read design files for review)
 - `write: true` (writes to output files)
 - `bash/edit/task/delegate_task: false`
@@ -149,6 +161,7 @@ Subagents (`designer_model_*`):
 ### Error Handling
 
 Subagents use a contract-based error protocol:
+
 - Success: `"WROTE: /path/to/file.md"`
 - Failure: `"FAILED: missing output_file"` or `"FAILED: <reason>"`
 
@@ -157,6 +170,7 @@ The primary agent surfaces failures in its final summary.
 ### Logging
 
 All logging uses Pino logger from `src/utils/logger.ts`:
+
 - Logs written to global config directory: `~/.config/opencode/design-lab.log` (macOS/Linux) or `%APPDATA%\opencode\design-lab.log` (Windows)
 - Use structured logging: `logger.info({ model, sessionID }, "message")`
 - Log levels: `trace`, `debug`, `info`, `warn`, `error`
@@ -166,13 +180,13 @@ All logging uses Pino logger from `src/utils/logger.ts`:
 
 Reviews use a **fixed weighted scoring rubric** (0-10 scale):
 
-| Criterion      | Weight |
-|----------------|--------|
-| Clarity        | 20%    |
-| Feasibility    | 25%    |
-| Scalability    | 20%    |
-| Maintainability| 20%    |
-| Completeness   | 15%    |
+| Criterion       | Weight |
+| --------------- | ------ |
+| Clarity         | 20%    |
+| Feasibility     | 25%    |
+| Scalability     | 20%    |
+| Maintainability | 20%    |
+| Completeness    | 15%    |
 
 Weighted Total = Σ(score × weight) / 100
 
@@ -196,6 +210,7 @@ All reviewers must include a score table at the bottom of their review markdown.
 ## Testing
 
 Currently minimal test coverage. When adding tests:
+
 - Use vitest framework
 - Test files: `*.test.ts` alongside source
 - Mock external dependencies (OpenCode client, file system)
