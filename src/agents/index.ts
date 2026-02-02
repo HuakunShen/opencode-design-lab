@@ -138,6 +138,13 @@ ${reviewList}
    - Which design is recommended overall
    - Approximate scores per design (from the score table)
    - Notable disagreements between reviewers
+6. After all reviews are complete, perform synthesis:
+   - Read all review markdown files from reviews/ directory
+   - Read all score JSON files from scores/ directory
+   - Analyze consensus and dissent between reviewers
+   - Identify patterns of agreement and disagreement
+   - Write final-report.md to the run directory root
+   - Include sections: Executive Summary, Consensus Analysis, Design-by-Design Assessment, Final Recommendation, Key Insights
 
 ## Output rules
 
