@@ -180,3 +180,7 @@ const POLL_INTERVAL_MS = 500;
 const MAX_POLL_TIME_MS = 10 * 60 * 1000; // 10 minutes
 const STABILITY_REQUIRED = 3;
 ```
+
+## Notes
+
+- Never auto commit for me
