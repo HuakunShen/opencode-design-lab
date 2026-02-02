@@ -109,15 +109,48 @@ Do NOT run reviews. Only generate designs.`,
  * finds the most recent run under the base output directory.
  */
 export function buildReviewCommand(options: CommandOptions): CommandConfig {
-  const reviewList = options.reviewModels
-    .map((spec) => `- ${spec.agentName} → reviews/review-${spec.fileStem}.md`)
-    .join("\n");
+   const reviewList = options.reviewModels
+     .map((spec) => `- ${spec.agentName} → reviews/review-${spec.fileStem}.md`)
+     .join("\n");
+ 
+   return {
+     description:
+       "Run cross-reviews on existing designs using all configured review models",
+     agent: "designer",
+     template: `Run cross-reviews on existing designs.
+ 
+ $input
+ 
+ ## Instructions
+ 
+ 1. If a run directory is specified above, use it. Otherwise, find the most
+    recent run directory under ${options.baseOutputDir}/ (sort by date prefix).
+ 2. Read all design files from the designs/ subdirectory.
+ 3. Create subdirectory: reviews/ (if it doesn't exist).
+ 4. Delegate review tasks to each review subagent in parallel:
+ ${reviewList}
+ 5. Fire all delegate_task calls simultaneously - do NOT wait for each to complete before starting the next.
+ 6. Each reviewer must read ALL designs and produce ONE comparative markdown
+    report written to its output_file path.
+ 7. Wait for ALL review subagents to complete, then read the reviews and produce a summary:
+    - Which design is recommended overall
+    - Approximate scores per design
+    - Notable disagreements between reviewers`,
+   };
+}
 
+/**
+ * Build the `/synthesize` command configuration.
+ *
+ * Usage: /synthesize [run-directory]
+ * Synthesizes reviews and scores into a final qualitative report.
+ * If no directory is given, finds the most recent run under the base output directory.
+ */
+export function buildSynthesizeCommand(options: CommandOptions): CommandConfig {
   return {
-    description:
-      "Run cross-reviews on existing designs using all configured review models",
+    description: "Synthesize reviews into final qualitative report",
     agent: "designer",
-    template: `Run cross-reviews on existing designs.
+    template: `Synthesize reviews and scores into a final qualitative report.
 
 $input
 
@@ -125,16 +158,19 @@ $input
 
 1. If a run directory is specified above, use it. Otherwise, find the most
    recent run directory under ${options.baseOutputDir}/ (sort by date prefix).
-2. Read all design files from the designs/ subdirectory.
-3. Create subdirectory: reviews/ (if it doesn't exist).
-4. Delegate review tasks to each review subagent in parallel:
-${reviewList}
-5. Fire all delegate_task calls simultaneously - do NOT wait for each to complete before starting the next.
-6. Each reviewer must read ALL designs and produce ONE comparative markdown
-   report written to its output_file path.
-7. Wait for ALL review subagents to complete, then read the reviews and produce a summary:
-   - Which design is recommended overall
-   - Approximate scores per design
-   - Notable disagreements between reviewers`,
+2. Read all review files from the reviews/ subdirectory.
+3. Read all score files from the scores/ subdirectory.
+4. Perform qualitative synthesis:
+   - Analyze patterns across all reviews
+   - Identify consensus and disagreements
+   - Synthesize scores with qualitative insights
+   - Determine overall recommendations
+5. Write the final synthesis report to final-report.md with the following sections:
+   - Executive Summary
+   - Design Comparison Matrix
+   - Qualitative Analysis
+   - Consensus Findings
+   - Recommendations
+   - Appendix (detailed scores and review excerpts)`,
   };
 }
