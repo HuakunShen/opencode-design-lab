@@ -109,15 +109,15 @@ Do NOT run reviews. Only generate designs.`,
  * finds the most recent run under the base output directory.
  */
 export function buildReviewCommand(options: CommandOptions): CommandConfig {
-   const reviewList = options.reviewModels
-     .map((spec) => `- ${spec.agentName} → reviews/review-${spec.fileStem}.md`)
-     .join("\n");
- 
-   return {
-     description:
-       "Run cross-reviews on existing designs using all configured review models",
-     agent: "designer",
-     template: `Run cross-reviews on existing designs.
+  const reviewList = options.reviewModels
+    .map((spec) => `- ${spec.agentName} → reviews/review-${spec.fileStem}.md`)
+    .join("\n");
+
+  return {
+    description:
+      "Run cross-reviews on existing designs using all configured review models",
+    agent: "designer",
+    template: `Run cross-reviews on existing designs.
  
  $input
  
@@ -136,7 +136,7 @@ export function buildReviewCommand(options: CommandOptions): CommandConfig {
     - Which design is recommended overall
     - Approximate scores per design
     - Notable disagreements between reviewers`,
-   };
+  };
 }
 
 /**

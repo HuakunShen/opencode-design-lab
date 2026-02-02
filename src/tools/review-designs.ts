@@ -109,8 +109,11 @@ Use this after generate_designs to evaluate and compare the generated designs.`,
             const validationResult = ScoreSchema.safeParse(score);
             if (!validationResult.success) {
               logger.warn(
-                { designId: score.design_id, errors: validationResult.error.issues },
-                "Score validation warning"
+                {
+                  designId: score.design_id,
+                  errors: validationResult.error.issues,
+                },
+                "Score validation warning",
               );
             }
 
