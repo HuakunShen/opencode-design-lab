@@ -11,6 +11,7 @@ import {
   buildDesignCommand,
   buildInitCommand,
   buildReviewCommand,
+  buildSynthesizeCommand,
 } from "./commands";
 import { loadPluginConfig } from "./config";
 import { logger } from "./utils/logger";
@@ -90,6 +91,11 @@ export const DesignLab: Plugin = async (ctx) => {
             reviewModels: reviewSpecs,
           }),
           "design-lab:review": buildReviewCommand({
+            baseOutputDir: pluginConfig.base_output_dir,
+            designModels: designSpecs,
+            reviewModels: reviewSpecs,
+          }),
+          "design-lab:synthesize": buildSynthesizeCommand({
             baseOutputDir: pluginConfig.base_output_dir,
             designModels: designSpecs,
             reviewModels: reviewSpecs,
