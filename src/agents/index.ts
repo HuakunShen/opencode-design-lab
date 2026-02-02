@@ -48,9 +48,9 @@ export function createDesignerPrimaryAgent(
       read: true,
       bash: true,
       delegate_task: true,
-      edit: false,
+      edit: true,
       task: false,
-      write: false,
+      write: true,
     },
     permission: {
       bash: "allow",
