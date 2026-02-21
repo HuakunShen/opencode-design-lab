@@ -174,3 +174,92 @@ $input
    - Appendix (detailed scores and review excerpts)`,
   };
 }
+
+/**
+ * Build the `/repowiki` command configuration.
+ *
+ * Usage: /design-lab:repowiki [language]
+ * Generates comprehensive repository documentation in a structured wiki format.
+ * Creates hierarchical markdown documentation with architecture diagrams,
+ * source citations, and relationship metadata in .repowiki/ directory.
+ */
+export function buildRepowikiCommand(_baseDir: string): CommandConfig {
+  return {
+    description:
+      "Generate comprehensive repository wiki documentation with architecture diagrams and source citations",
+    agent: "designer",
+    template: `Generate comprehensive repository documentation (repowiki) for this codebase.
+
+## User Input
+$input
+
+## Instructions
+
+1. Check for existing repowiki at .repowiki/en/meta/repowiki-metadata.json
+   - If exists, read it to get the last_commit and perform an INCREMENTAL UPDATE
+   - If not exists, perform a FULL GENERATION
+
+2. **For FULL GENERATION**:
+   - Create .repowiki/en/content/ directory structure
+   - Generate the following standard topic categories:
+     - System Overview (root page)
+     - Getting Started Guide
+     - Development Guidelines
+     - Architecture/Architecture Overview
+     - Technology Stack & Architecture
+     - Backend Services overview
+     - Frontend Application
+     - Infrastructure overview
+     - API Reference
+   - Each page must include:
+     - Cite block with referenced files
+     - Table of Contents
+     - Source citations after each section
+     - Mermaid diagrams where appropriate
+   - Create .repowiki/en/meta/repowiki-metadata.json with:
+     - version: current date (YYYY-MM-DD)
+     - last_commit: current HEAD SHA
+     - wiki_items: all pages with IDs and paths
+     - knowledge_relations: parent-child relationships
+
+3. **For INCREMENTAL UPDATE**:
+   - Get current HEAD commit: git rev-parse HEAD
+   - Compare with last_commit from metadata
+   - List new commits: git log --oneline <last_commit>..HEAD
+   - Analyze changes: git diff --stat <last_commit>..HEAD
+   - Identify affected wiki pages based on changed file paths
+   - Update only affected pages with new content
+   - Update metadata with new last_commit and version
+
+4. **Output Structure**:
+   \`\`\`
+   .repowiki/
+   └── en/
+       ├── content/
+       │   ├── System Overview.md
+       │   ├── Getting Started Guide.md
+       │   ├── Architecture/
+       │   │   ├── Architecture.md
+       │   │   └── [subtopics]/
+       │   ├── Backend Services/
+       │   │   └── Backend Services.md
+       │   └── ...
+       └── meta/
+           └── repowiki-metadata.json
+   \`\`\`
+
+5. **Content Standards**:
+   - Use <cite> blocks at top of each file listing referenced files
+   - Include Table of Contents on every page
+   - Add **Section sources** after each major section
+   - Add **Diagram sources** after each Mermaid diagram
+   - File citations use format: [filename](file://path#L10-L50)
+   - Tone: Technical, professional, comprehensive
+   - Audience: Developers new to the codebase
+
+6. Report the status:
+   - Whether it was a full generation or incremental update
+   - List of created/updated files
+   - Summary of what was documented`,
+  };
+}

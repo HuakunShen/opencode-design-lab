@@ -1,7 +1,7 @@
 {
   "name": "opencode-design-lab",
   "type": "module",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "An OpenCode plugin that generates multiple independent design proposals using different AI models, then systematically evaluates, compares, and ranks those designs in a reproducible and structured way.",
   "author": "OpenCode Design Lab Contributors",
   "license": "MIT",

@@ -10,6 +10,7 @@ import {
 import {
   buildDesignCommand,
   buildInitCommand,
+  buildRepowikiCommand,
   buildReviewCommand,
   buildSynthesizeCommand,
 } from "./commands";
@@ -100,6 +101,7 @@ export const DesignLab: Plugin = async (ctx) => {
             designModels: designSpecs,
             reviewModels: reviewSpecs,
           }),
+          "design-lab:repowiki": buildRepowikiCommand(ctx.directory),
         };
 
         const agentKeys = Object.keys(config.agent ?? {});
