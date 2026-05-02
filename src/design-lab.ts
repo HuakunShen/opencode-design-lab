@@ -9,6 +9,7 @@ import {
 import {
   buildDesignCommand,
   buildInitCommand,
+  buildJournalCommand,
   buildRepowikiCommand,
   buildReviewCommand,
   buildSynthesizeCommand,
@@ -36,10 +37,11 @@ export const DesignLab: Plugin = async (ctx) => {
 
   return {
     config: async (config) => {
-      // Always register the init command (cannot be skipped)
+      // Always register the init and journal commands (no config needed)
       config.command = {
         ...(config.command ?? {}),
         "design-lab:init": buildInitCommand(ctx.directory),
+        "design-lab:journal": buildJournalCommand(),
       };
 
       // Only register agents and other commands if config exists

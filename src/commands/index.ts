@@ -258,8 +258,38 @@ $input
    - Audience: Developers new to the codebase
 
 6. Report the status:
-   - Whether it was a full generation or incremental update
-   - List of created/updated files
-   - Summary of what was documented`,
+    - Whether it was a full generation or incremental update
+    - List of created/updated files
+    - Summary of what was documented`,
+  };
+}
+
+/**
+ * Build the `/journal` command configuration.
+ *
+ * Usage: /design-lab:journal
+ * Reviews recent git changes and conversation context, then documents
+ * decisions, tradeoffs, and rationale in a dated journal file.
+ */
+export function buildJournalCommand(): CommandConfig {
+  return {
+    description:
+      "Document recent changes, decisions, and tradeoffs in a dated journal file",
+    template: `Review recent changes and decisions, and document them in a dated journal file.
+
+## Instructions
+
+1. Get the current datetime in YYYY-MM-DD-HHMM format.
+2. Run git diff HEAD~1 (or appropriate range) to understand recent changes.
+3. Review the recent conversation history for context on "why" decisions were made.
+4. Ensure the .journal directory exists in the project root.
+5. Write a dated journal entry at .journal/YYYY-MM-DD-HHMM.md with this structure:
+   - **Timestamp**: The time of the entry.
+   - **Core Decision/Topic**: The primary focus.
+   - **Options Considered**: Alternatives that were discussed.
+   - **Final Decision & Rationale**: Why the specific path was chosen.
+   - **Key Changes Made**: Summary of modified files/logic.
+   - **Future Considerations**: Any remaining debt or follow-up items.
+6. Return a confirmation message with the file path.`,
   };
 }
