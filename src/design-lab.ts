@@ -1,5 +1,4 @@
 import type { Plugin } from "@opencode-ai/plugin";
-import type { Config } from "@opencode-ai/sdk";
 
 import {
   createDesignerModelAgent,
@@ -36,7 +35,7 @@ export const DesignLab: Plugin = async (ctx) => {
   }
 
   return {
-    config: async (config: Config) => {
+    config: async (config) => {
       // Always register the init command (cannot be skipped)
       config.command = {
         ...(config.command ?? {}),
