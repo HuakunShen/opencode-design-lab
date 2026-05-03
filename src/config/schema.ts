@@ -1,23 +1,44 @@
 import { z } from "zod";
 
 /**
+ * Per-model configuration.
+ * Accepts a plain model string (default variant = "max") or an object with model + variant.
+ */
+const ModelConfigSchema = z.union([
+  z.string().describe("Model identifier (e.g. 'opencode/kimi-k2.6')"),
+  z.object({
+    model: z.string().describe("Model identifier (e.g. 'opencode/kimi-k2.6')"),
+    variant: z
+      .enum(["low", "medium", "high", "max"])
+      .default("max")
+      .describe("Reasoning effort variant"),
+  }),
+]);
+
+export type ModelConfig = z.infer<typeof ModelConfigSchema>;
+
+/**
  * Configuration schema for OpenCode Design Lab plugin
  */
 export const DesignLabConfigSchema = z.object({
   $schema: z.string().optional(),
   /**
-   * List of models to use for design generation
-   * Each model will generate one independent design
+   * List of models to use for design generation.
+   * Each entry can be a plain model string ("opencode/kimi-k2.6") or an object
+   * with model + variant ({"model": "opencode/kimi-k2.6", "variant": "max"}).
+   * Default variant for plain strings is "max".
+   * Minimum 2 models required.
    */
   design_models: z
-    .array(z.string())
+    .array(ModelConfigSchema)
     .min(2, "At least 2 design models required"),
 
   /**
-   * List of models to use for design review and scoring
-   * If not specified, defaults to using all design_models
+   * List of models to use for design review and scoring.
+   * If not specified, defaults to using all design_models.
+   * Each entry follows the same format as design_models.
    */
-  review_models: z.array(z.string()).optional(),
+  review_models: z.array(ModelConfigSchema).optional(),
 
   /**
    * Base output directory for design labs

@@ -2,17 +2,80 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "properties": {
+    "$schema": {
+      "type": "string"
+    },
     "design_models": {
       "minItems": 2,
       "type": "array",
       "items": {
-        "type": "string"
+        "anyOf": [
+          {
+            "type": "string",
+            "description": "Model identifier (e.g. 'opencode/kimi-k2.6')"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "model": {
+                "type": "string",
+                "description": "Model identifier (e.g. 'opencode/kimi-k2.6')"
+              },
+              "variant": {
+                "default": "max",
+                "description": "Reasoning effort variant",
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high",
+                  "max"
+                ]
+              }
+            },
+            "required": [
+              "model",
+              "variant"
+            ],
+            "additionalProperties": false
+          }
+        ]
       }
     },
     "review_models": {
       "type": "array",
       "items": {
-        "type": "string"
+        "anyOf": [
+          {
+            "type": "string",
+            "description": "Model identifier (e.g. 'opencode/kimi-k2.6')"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "model": {
+                "type": "string",
+                "description": "Model identifier (e.g. 'opencode/kimi-k2.6')"
+              },
+              "variant": {
+                "default": "max",
+                "description": "Reasoning effort variant",
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high",
+                  "max"
+                ]
+              }
+            },
+            "required": [
+              "model",
+              "variant"
+            ],
+            "additionalProperties": false
+          }
+        ]
       }
     },
     "base_output_dir": {

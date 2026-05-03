@@ -1,11 +1,13 @@
 import type { AgentConfig } from "@opencode-ai/sdk";
 
+import type { ModelConfig } from "../config/schema";
 import { getModelShortName } from "../utils/session-helpers";
 
 const DESIGNER_SUBAGENT_PREFIX = "designer_model_";
 
 type DesignerModelSpec = {
   model: string;
+  variant?: string;
   agentName: string;
   fileStem: string;
 };
@@ -28,6 +30,19 @@ export function getDesignerSubagentName(model: string): string {
  */
 export function getDesignerModelFileStem(model: string): string {
   return normalizeModelSlug(model);
+}
+
+/**
+ * Normalize a ModelConfig (string or object) to { model, variant }.
+ * String entries get default variant "max".
+ */
+export function normalizeModelConfig(
+  config: ModelConfig,
+): { model: string; variant: string } {
+  if (typeof config === "string") {
+    return { model: config, variant: "max" };
+  }
+  return { model: config.model, variant: config.variant ?? "max" };
 }
 
 /**
@@ -63,11 +78,15 @@ export function createDesignerPrimaryAgent(
 /**
  * Create a designer subagent configuration for a specific model.
  */
-export function createDesignerModelAgent(model: string): AgentConfig {
+export function createDesignerModelAgent(
+  model: string,
+  variant?: string,
+): AgentConfig {
   return {
     description: "Design Lab subagent that writes designs or reviews to files.",
     mode: "subagent",
     model,
+    ...(variant ? { variant } : {}),
     prompt: buildDesignerSubagentPrompt(model),
     tools: {
       read: true,
@@ -91,13 +110,13 @@ function buildDesignerPrimaryPrompt(
   const designList = options.designModels
     .map(
       (spec) =>
-        `- ${spec.agentName} (model: ${spec.model}, file: ${spec.fileStem}.md)`,
+        `- ${spec.agentName} (model: ${spec.model}${spec.variant ? `, variant: ${spec.variant}` : ""}, file: ${spec.fileStem}.md)`,
     )
     .join("\n");
   const reviewList = options.reviewModels
     .map(
       (spec) =>
-        `- ${spec.agentName} (model: ${spec.model}, file: review-${spec.fileStem}.md)`,
+        `- ${spec.agentName} (model: ${spec.model}${spec.variant ? `, variant: ${spec.variant}` : ""}, file: review-${spec.fileStem}.md)`,
     )
     .join("\n");
 
@@ -111,6 +130,51 @@ ${designList}
 Review subagents:
 ${reviewList}
 
+## How to delegate tasks (CRITICAL)
+
+You MUST use the \`delegate_task\` tool to assign work to subagents. This creates sub-sessions within the current session that the user can expand and view.
+
+DO NOT create new independent sessions. DO NOT use \`task\` or any other mechanism. ONLY use \`delegate_task\`.
+
+For each subagent, call \`delegate_task\` with these parameters:
+- \`agent\`: The exact subagent name from the list above (e.g., "designer_model_kimik25")
+- \`prompt\`: The full task instructions including requirements and the exact output file path
+- \`description\`: A brief summary of what this subagent will do
+
+Example for a design subagent:
+\`\`\`
+<function=delegate_task>
+<parameter=agent>designer_model_kimik25</parameter>
+<parameter=prompt>Design a short URL service with the following requirements: [requirements]. Write the complete design to: ${options.baseOutputDir}/YYYY-MM-DD-topic/designs/kimik25.md. ONLY write to the file — do NOT output the design in chat.</parameter>
+<parameter=description>Generate short URL design using kimik25</parameter>
+</function>
+\`\`\`
+
+## Subagent failure detection (CRITICAL)
+
+\`delegate_task\` returns a text result. You MUST inspect EVERY result to determine success vs failure. Do NOT assume success — check explicitly.
+
+**FAILURE signals** (subagent did NOT complete its task):
+- Text starts with "Execute task failed" or "Failed to create session"
+- Text contains "FAILED:"
+- Text contains "[ERROR]" or "[Task Empty Response Warning]"
+- Text contains "No payment method", "rate limit", "timeout", "capacity", "overloaded"  
+- Text contains "Poll timeout reached"
+- Text contains "SUPERVISED TASK FAILED" or "Task aborted"
+- The file was NOT written (verify with read tool after completion)
+
+**SUCCESS signals** (subagent completed its task):
+- Text starts with "Task completed in"
+- Text contains "WROTE:"
+- The expected output file exists and has non-trivial content
+
+**Required action on failure:**
+1. Payment/auth errors ("No payment method", "Add a payment method"): Skip that subagent silently — its model is unavailable. Continue with other subagents.
+2. Rate-limit / timeout errors: Retry the \`delegate_task\` ONCE with the same agent and parameters.
+3. Missing output_file or parameter errors: Fix the \`prompt\` to include the missing parameter and retry ONCE.
+4. If ALL subagents fail: Stop immediately and report each failure to the user with agent name + reason.
+5. In your final summary, always list which subagents succeeded and which failed (with the specific error reason).
+
 ## Workflow
 
 1. Create a new run directory under "${options.baseOutputDir}" using the format:
@@ -121,37 +185,60 @@ ${reviewList}
    - designs/
    - reviews/
 3. For each design subagent, delegate a design task in parallel:
-    - Use delegate_task for ALL design subagents simultaneously (do not wait for each to complete)
+    - Use \`delegate_task\` for ALL design subagents simultaneously (do not wait for each to complete)
     - Provide the requirements and the exact output_file path:
       ${options.baseOutputDir}/YYYY-MM-DD-topic/designs/{fileStem}.md
     - The output_file path is mandatory. If you omit it, the subagent must fail.
     - Instruct the subagent to write ONLY to the file and NOT to output the design in chat.
     - Wait for ALL design subagents to complete before proceeding.
+    - After all complete, CHECK EACH RESULT using the failure detection rules above.
 4. After all designs are written, delegate review tasks in parallel:
-    - Use delegate_task for ALL review subagents simultaneously (do not wait for each to complete)
+    - Use \`delegate_task\` for ALL review subagents simultaneously (do not wait for each to complete)
     - Provide the list of design file paths.
     - Provide the exact output_file path:
       ${options.baseOutputDir}/YYYY-MM-DD-topic/reviews/review-{fileStem}.md
     - Each reviewer must produce ONE markdown report comparing ALL designs at once.
     - Wait for ALL review subagents to complete before proceeding.
+    - After all complete, CHECK EACH RESULT using the failure detection rules above.
 5. After all reviews are written, read every review file and produce a short summary:
    - Which design is recommended overall
    - Approximate scores per design (from the score table)
    - Notable disagreements between reviewers
-6. After all reviews are complete, perform synthesis:
-   - Read all review markdown files from reviews/ directory
-   - Read all score JSON files from scores/ directory
-   - Analyze consensus and dissent between reviewers
-   - Identify patterns of agreement and disagreement
-   - Write final-report.md to the run directory root
-   - Include sections: Executive Summary, Consensus Analysis, Design-by-Design Assessment, Final Recommendation, Key Insights
+   - Which subagents failed (if any) and why
+ 6. After all reviews are complete, perform synthesis:
+    - Read all review markdown files from reviews/ directory
+    - Read all score JSON files from scores/ directory
+    - Analyze consensus and dissent between reviewers
+    - Identify patterns of agreement and disagreement
+    - Write final-report.md to the run directory root
+    - Include sections: Executive Summary, Consensus Analysis, Design-by-Design Assessment, Final Recommendation, Key Insights
+
+## Iterative revision workflow
+
+When the user asks you to revise or update existing designs with new instructions:
+
+1. Locate the run directory (use the most recent one under ${options.baseOutputDir} unless the user specifies).
+2. Read all existing design files from designs/ so you know the current state.
+3. For each design subagent, delegate a revision task in parallel:
+   - Use \`delegate_task\` for ALL design subagents simultaneously.
+   - agent: that subagent's name from the list above (e.g., "designer_model_kimik25")
+   - prompt: "Read the existing design at ${options.baseOutputDir}/YYYY-MM-DD-topic/designs/{fileStem}.md. Then revise it according to these new instructions: [user's revision instructions]. Write the updated design back to the SAME file. Only modify your own assigned file — do not touch other designs."
+   - description: "Revise {fileStem} design with new instructions"
+   - Wait for ALL revision subagents to complete, then CHECK EACH RESULT using failure detection rules.
+4. After all designs are revised, re-run reviews:
+   - Use \`delegate_task\` for ALL review subagents simultaneously (same as step 4 in main workflow).
+   - Each reviewer compares ALL updated designs.
+   - Wait for ALL review subagents to complete, then CHECK EACH RESULT.
+5. Provide summary of changes and updated review consensus.
 
 ## Output rules
 
 - Never paste design or review content into the main chat.
 - Return only a concise summary with the run directory, file paths, and the review summary.
 - If asked "what agents will you call", list the design subagents by name.
-- Use only the subagents listed above; do not invent agent names.`;
+- Use only the subagents listed above; do not invent agent names.
+- ALWAYS use \`delegate_task\` for delegation. NEVER create independent sessions.
+- ALWAYS report failed subagents in your summary with the specific agent name and error reason.`;
 }
 
 function buildDesignerSubagentPrompt(model: string): string {
@@ -168,12 +255,37 @@ You only take tasks from the primary designer agent. You must write outputs to f
 - After writing, reply with: "WROTE: <output_file>".
 - If you cannot complete the task, reply with: "FAILED: <reason>".
 
+## Error reporting (CRITICAL)
+
+If an error prevents task completion, you MUST start your reply with "FAILED:" followed by a specific reason.
+
+Common failure scenarios and the exact message to use:
+- No model access / payment required: "FAILED: model unavailable (payment required)"
+- Rate limited: "FAILED: rate limited, retry later"
+- Invalid or missing parameters: "FAILED: <specific parameter issue>"
+- Tool cannot execute: "FAILED: tool error — <specific tool and error>"
+- Can't read source files: "FAILED: cannot read <file path>"
+- Timeout / no response: "FAILED: no response from model"
+
+The primary agent monitors for these signals. Be precise about the reason so it can decide whether to retry or skip.
+
 ## Design tasks
 
 When asked to design:
 - Produce a concise but complete Markdown design document.
 - Use these sections (in this order): Title, Summary, Goals, Non-Goals, Architecture, Components, Data Flow, Tradeoffs, Risks, Open Questions.
 - Write the design to the provided output_file.
+
+## Revision tasks
+
+When asked to revise an existing design:
+- Read the existing design file FIRST using the read tool.
+- Understand the current design before making changes.
+- Apply the new revision instructions to update the design.
+- Write the updated design back to the SAME file (overwrite).
+- Do NOT create a new file or a versioned copy — always overwrite the specified path.
+- Do NOT read or modify other design files — only your own.
+- After writing, reply with: "WROTE: <output_file>".
 
 ## Review tasks
 

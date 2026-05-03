@@ -9,6 +9,7 @@ Design Lab uses a file-first, multi-model workflow:
 
 - **Dynamic model mapping**: Subagents are created from your config
 - **Correct model usage**: Each subagent is bound to its configured model
+- **Per-model variant**: Control reasoning effort per model (`low`/`medium`/`high`/`max`)
 - **File-first outputs**: Designs and reviews are written to disk, not chat
 - **Cross-review**: The same model set reviews all designs in a single report
 
@@ -55,24 +56,52 @@ Create a config file at `~/.config/opencode/design-lab.json` or
 
 ```json
 {
-  "design_models": ["claude-sonnet-4", "gpt-4o", "gemini-3-pro"],
-  "review_models": ["claude-opus-4", "gpt-5-2"],
-  "base_output_dir": ".design-lab",
-  "design_agent_temperature": 0.7,
-  "review_agent_temperature": 0.1
+  "$schema": "https://raw.githubusercontent.com/HuakunShen/opencode-design-lab/main/schemas/design-lab-config.schema.json",
+  "design_models": [
+    "claude-sonnet-4",
+    "gpt-4o",
+    "gemini-3-pro"
+  ],
+  "review_models": [
+    "claude-opus-4",
+    "gpt-5-2"
+  ],
+  "base_output_dir": ".design-lab"
+}
+```
+
+Each model can also be configured as an object with a `variant` to control reasoning effort:
+
+```json
+{
+  "design_models": [
+    { "model": "opencode/kimi-k2.6", "variant": "max" },
+    { "model": "opencode/kimi-k2.5", "variant": "high" }
+  ]
 }
 ```
 
 ### Configuration Options
 
-| Option                     | Type       | Default            | Description                                                               |
-| -------------------------- | ---------- | ------------------ | ------------------------------------------------------------------------- |
-| `design_models`            | `string[]` | **Required**       | Models to use for design generation (min 2)                               |
-| `review_models`            | `string[]` | `design_models`    | Models to use for reviews. Defaults to all design models if not specified |
-| `base_output_dir`          | `string`   | `.design-lab`      | Base directory for design lab outputs                                     |
-| `design_agent_temperature` | `number`   | `0.7`              | Reserved for future use                                                   |
-| `review_agent_temperature` | `number`   | `0.1`              | Reserved for future use                                                   |
-| `topic_generator_model`    | `string`   | First design model | Reserved for future use                                                   |
+| Option                     | Type                       | Default            | Description                                                               |
+| -------------------------- | -------------------------- | ------------------ | ------------------------------------------------------------------------- |
+| `design_models`            | `(string \| object)[]`     | **Required**       | Models for design generation (min 2). Strings default variant to `max`    |
+| `review_models`            | `(string \| object)[]`     | `design_models`    | Models for reviews. Defaults to design models if not specified            |
+| `base_output_dir`          | `string`                   | `.design-lab`      | Base directory for design lab outputs                                     |
+| `design_agent_temperature` | `number`                   | `0.7`              | Reserved for future use                                                   |
+| `review_agent_temperature` | `number`                   | `0.1`              | Reserved for future use                                                   |
+| `topic_generator_model`    | `string`                   | First design model | Reserved for future use                                                   |
+
+### Model Variant
+
+Each model entry supports an optional `variant` field:
+
+| Variant | Description |
+|---------|-------------|
+| `max`   | Highest reasoning effort (default for plain strings). Models cap at their maximum. |
+| `high`  | High effort. Good for reviews. |
+| `medium` | Balanced. |
+| `low`   | Fastest, lowest cost. |
 
 ## Usage
 

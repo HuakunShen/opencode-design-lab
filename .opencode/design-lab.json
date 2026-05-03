@@ -1,0 +1,14 @@
+{
+  "$schema": "https://raw.githubusercontent.com/HuakunShen/opencode-design-lab/main/schemas/design-lab-config.schema.json",
+  "design_models": [
+    { "model": "opencode/kimi-k2.6", "variant": "max" },
+    { "model": "opencode/kimi-k2.5", "variant": "max" }
+  ],
+  "review_models": [
+    { "model": "opencode/kimi-k2.6", "variant": "high" },
+    { "model": "opencode/kimi-k2.5", "variant": "high" }
+  ],
+  "base_output_dir": ".design-lab",
+  "design_agent_temperature": 0.7,
+  "review_agent_temperature": 0.1
+}

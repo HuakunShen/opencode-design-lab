@@ -101,7 +101,8 @@ Use this when you want to explore multiple approaches to a design problem and co
       );
 
       // Generate designs from each model in parallel
-      const designPromises = config.design_models.map(async (model) => {
+      const designPromises = config.design_models.map(async (modelConfig) => {
+        const model = typeof modelConfig === "string" ? modelConfig : modelConfig.model;
         try {
           logger.info(
             { model },

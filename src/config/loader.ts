@@ -113,6 +113,32 @@ function getUserConfigDir(): string {
 }
 
 /**
+ * Get all possible config file paths in priority order (highest to lowest).
+ *
+ * Priority order:
+ * 1. Project-level: `.opencode/design-lab.json`
+ * 2. Project-level: `.opencode/design-lab.jsonc`
+ * 3. User-level: `~/.config/opencode/design-lab.json`
+ * 4. User-level: `~/.config/opencode/design-lab.jsonc`
+ *
+ * Pure function — no file I/O, no side effects.
+ *
+ * @param directory - Project directory
+ * @returns Array of config file paths in priority order
+ */
+export function getConfigPaths(directory: string): string[] {
+  const userConfigDir = getUserConfigDir();
+  const projectBase = path.join(directory, ".opencode", "design-lab");
+  const userBase = path.join(userConfigDir, "opencode", "design-lab");
+  return [
+    `${projectBase}.json`,
+    `${projectBase}.jsonc`,
+    `${userBase}.json`,
+    `${userBase}.jsonc`,
+  ];
+}
+
+/**
  * Load and merge plugin configuration from multiple sources
  *
  * Priority (highest to lowest):
@@ -123,19 +149,13 @@ function getUserConfigDir(): string {
  * @returns Merged and validated configuration
  */
 export function loadPluginConfig(directory: string): DesignLabConfig | null {
-  // User-level config path
-  const userConfigPath = path.join(
-    getUserConfigDir(),
-    "opencode",
-    "design-lab",
-  );
-
-  // Project-level config path
-  const projectConfigPath = path.join(directory, ".opencode", "design-lab");
+  const configPaths = getConfigPaths(directory);
+  const projectBasePath = configPaths[0].replace(/\.jsonc?$/, "");
+  const userBasePath = configPaths[2].replace(/\.jsonc?$/, "");
 
   // Load configs
-  const userConfigResult = loadConfigFromPath(userConfigPath);
-  const projectConfigResult = loadConfigFromPath(projectConfigPath);
+  const projectConfigResult = loadConfigFromPath(projectBasePath);
+  const userConfigResult = loadConfigFromPath(userBasePath);
 
   if (userConfigResult.error || projectConfigResult.error) {
     logger.error(
@@ -165,7 +185,7 @@ export function loadPluginConfig(directory: string): DesignLabConfig | null {
 
   if (!userConfigResult.config && !projectConfigResult.config) {
     logger.warn(
-      { userConfigPath, projectConfigPath },
+      { userConfigPath: userBasePath, projectConfigPath: projectBasePath },
       "DesignLab config not found; plugin disabled",
     );
     return null;

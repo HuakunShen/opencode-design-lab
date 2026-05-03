@@ -35,7 +35,11 @@
             }
           }
         },
-        "required": ["name", "description", "responsibilities"],
+        "required": [
+          "name",
+          "description",
+          "responsibilities"
+        ],
         "additionalProperties": false
       }
     },
@@ -63,7 +67,12 @@
             "type": "string"
           }
         },
-        "required": ["aspect", "options", "chosen", "rationale"],
+        "required": [
+          "aspect",
+          "options",
+          "chosen",
+          "rationale"
+        ],
         "additionalProperties": false
       }
     },
@@ -77,13 +86,21 @@
           },
           "impact": {
             "type": "string",
-            "enum": ["low", "medium", "high"]
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
           },
           "mitigation": {
             "type": "string"
           }
         },
-        "required": ["risk", "impact", "mitigation"],
+        "required": [
+          "risk",
+          "impact",
+          "mitigation"
+        ],
         "additionalProperties": false
       }
     },

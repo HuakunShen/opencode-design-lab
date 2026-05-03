@@ -24,9 +24,11 @@ primary agent does not need to ingest large artifacts into the chat context.
 
 - **Dynamic model registration**: Subagents are created from config at startup
 - **Correct model usage**: Each subagent is bound to its configured model
+- **Per-model effort control**: Each model supports `variant` (low/medium/high/max)
 - **File-first outputs**: Designs and reviews are written to disk, not chat
 - **Parallel orchestration**: Subagents run simultaneously for performance (~N× speedup with N models)
 - **Cross-review**: The same model set reviews all designs in a single report
+- **Hot-reloadable config**: Changes to `.opencode/design-lab.json` take effect on next command
 
 ## Core Principles
 
@@ -134,6 +136,7 @@ separators with hyphens (e.g., `zhipuai-coding-plan/glm-4.6` → `glm-4-6`).
 **Responsibilities**:
 
 - Load `DesignLabConfig` from disk
+- Normalize model configs (strings → `{ model, variant: "max" }`)
 - Register the primary agent `designer`
 - Register a `designer_model_*` subagent for each configured model
 - Provide consistent file naming and agent naming
@@ -217,22 +220,60 @@ intentionally sequential to reduce contention and make results reproducible.
 
 ## Error Handling
 
-- Subagents report failures with `FAILED: <reason>`
-- The primary agent surfaces failures in its summary
+- Subagents report failures with `FAILED: <reason>` (6 standardized error codes)
+- Primary agent inspects every `delegate_task` result for failure signals
+- Payment/auth errors: subagent skipped, other subagents continue
+- Rate-limit/timeout errors: retried once before giving up
+- All-subagent failure: stops and reports to user with per-agent error details
 - Directory creation errors are reported immediately
 
 ## Configuration
 
+### Schema
+
 ```typescript
+type ModelConfig = string | {
+  model: string;
+  variant?: "low" | "medium" | "high" | "max";  // default: "max"
+};
+
 {
-  design_models: string[];        // Min 2, models for design generation
-  review_models?: string[];       // Defaults to design_models
-  base_output_dir: string;        // Default: ".design-lab"
-  design_agent_temperature: number;  // Reserved for future use
-  review_agent_temperature: number;  // Reserved for future use
-  topic_generator_model?: string; // Reserved for future use
+  $schema?: string;                    // URL to JSON schema for IDE validation
+  design_models: ModelConfig[];        // Min 2, models for design generation
+  review_models?: ModelConfig[];       // Defaults to design_models
+  base_output_dir: string;             // Default: ".design-lab"
+  design_agent_temperature: number;    // Default: 0.7
+  review_agent_temperature: number;    // Default: 0.1
+  topic_generator_model?: string;      // Reserved for future use
 }
 ```
+
+### Variant (Reasoning Effort)
+
+Each model supports a `variant` field to control reasoning effort:
+
+| Variant | Behavior |
+|---------|----------|
+| `max` | Highest effort (default for design). Each model maps this to its maximum. Opus supports true max; Sonnet caps at high. |
+| `high` | High effort. Good for review tasks where speed matters more than exhaustive reasoning. |
+| `medium` | Balanced. |
+| `low` | Minimal reasoning. Fastest, lowest cost. |
+
+Models are configured either as plain strings (default variant = `max`) or as objects:
+
+```json
+{
+  "design_models": [
+    "opencode/kimi-k2.6",
+    { "model": "opencode/kimi-k2.5", "variant": "high" }
+  ],
+  "review_models": [
+    { "model": "opencode/kimi-k2.6", "variant": "high" }
+  ]
+}
+```
+
+JSON Schema available at: `https://raw.githubusercontent.com/HuakunShen/opencode-design-lab/main/schemas/design-lab-config.schema.json`
 
 ## Future Improvements
 
@@ -240,12 +281,14 @@ intentionally sequential to reduce contention and make results reproducible.
 
 - Persist requirements to `task.md` in each run directory
 - Add retries for subagent failures with exponential backoff
+- Model-level fallback chains for unavailable models
 
 ### Features
 
 - Optional JSON schema outputs alongside Markdown
 - Aggregated score summaries from reviewer reports
 - Parallel execution with rate limiting
+- Iterative design revision (each subagent revises only its own file, then re-reviews)
 
 ### User Experience
 

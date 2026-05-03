@@ -5,6 +5,7 @@ import {
   createDesignerPrimaryAgent,
   getDesignerModelFileStem,
   getDesignerSubagentName,
+  normalizeModelConfig,
 } from "./agents";
 import {
   buildDesignCommand,
@@ -24,56 +25,60 @@ import { logger } from "./utils/logger";
  * then systematically evaluates, compares, and ranks those designs.
  */
 export const DesignLab: Plugin = async (ctx) => {
-  // Load configuration
-  const pluginConfig = loadPluginConfig(ctx.directory);
-
-  if (!pluginConfig) {
-    logger.warn(
-      "DesignLab config not found; only init command will be available",
-    );
-  } else {
-    logger.info("Design Lab Plugin Loaded");
-  }
-
   return {
     config: async (config) => {
-      // Always register the init and journal commands (no config needed)
+      // Load configuration fresh in the config callback
+      const pluginConfig = loadPluginConfig(ctx.directory);
+
+      // Always register ALL commands unconditionally
+      // The design/review/synthesize commands read config dynamically at runtime
       config.command = {
         ...(config.command ?? {}),
         "design-lab:init": buildInitCommand(ctx.directory),
         "design-lab:journal": buildJournalCommand(),
         "design-lab:repowiki": buildRepowikiCommand(ctx.directory),
+        "design-lab:design": buildDesignCommand(ctx.directory),
+        "design-lab:review": buildReviewCommand(ctx.directory),
+        "design-lab:synthesize": buildSynthesizeCommand(ctx.directory),
       };
 
-      // Only register agents and other commands if config exists
       if (pluginConfig) {
-        const designModels = uniqueModels(pluginConfig.design_models);
-        const reviewModels = uniqueModels(
-          pluginConfig.review_models ?? pluginConfig.design_models,
-        );
-        const allModels = uniqueModels([...designModels, ...reviewModels]);
+        logger.info("Design Lab Plugin Loaded");
+
+        const designConfigs = pluginConfig.design_models.map(normalizeModelConfig);
+        const reviewConfigs = (
+          pluginConfig.review_models ?? pluginConfig.design_models
+        ).map(normalizeModelConfig);
+
+        const designConfigsUnique = uniqueNormalizedConfigs(designConfigs);
+        const reviewConfigsUnique = uniqueNormalizedConfigs(reviewConfigs);
+        const allConfigs = uniqueNormalizedConfigs([
+          ...designConfigsUnique,
+          ...reviewConfigsUnique,
+        ]);
 
         const modelSpecs = new Map(
-          allModels.map((model) => [
-            model,
+          allConfigs.map((cfg) => [
+            cfg.model,
             {
-              model,
-              agentName: getDesignerSubagentName(model),
-              fileStem: getDesignerModelFileStem(model),
+              model: cfg.model,
+              variant: cfg.variant,
+              agentName: getDesignerSubagentName(cfg.model),
+              fileStem: getDesignerModelFileStem(cfg.model),
             },
           ]),
         );
 
-        const designSpecs = designModels
-          .map((model) => modelSpecs.get(model))
+        const designSpecs = designConfigsUnique
+          .map((cfg) => modelSpecs.get(cfg.model))
           .filter(isModelSpec);
-        const reviewSpecs = reviewModels
-          .map((model) => modelSpecs.get(model))
+        const reviewSpecs = reviewConfigsUnique
+          .map((cfg) => modelSpecs.get(cfg.model))
           .filter(isModelSpec);
 
         const subagentEntries = Array.from(modelSpecs.values()).map((spec) => [
           spec.agentName,
-          createDesignerModelAgent(spec.model),
+          createDesignerModelAgent(spec.model, spec.variant),
         ]);
 
         config.agent = {
@@ -86,59 +91,42 @@ export const DesignLab: Plugin = async (ctx) => {
           ...Object.fromEntries(subagentEntries),
         };
 
-        config.command = {
-          ...(config.command ?? {}),
-          "design-lab:design": buildDesignCommand({
-            baseOutputDir: pluginConfig.base_output_dir,
-            designModels: designSpecs,
-            reviewModels: reviewSpecs,
-          }),
-          "design-lab:review": buildReviewCommand({
-            baseOutputDir: pluginConfig.base_output_dir,
-            designModels: designSpecs,
-            reviewModels: reviewSpecs,
-          }),
-          "design-lab:synthesize": buildSynthesizeCommand({
-            baseOutputDir: pluginConfig.base_output_dir,
-            designModels: designSpecs,
-            reviewModels: reviewSpecs,
-          }),
-        };
-
         const agentKeys = Object.keys(config.agent ?? {});
         const commandKeys = Object.keys(config.command ?? {});
         logger.info(
           {
-            designModels,
-            reviewModels,
+            designModels: designConfigsUnique.map((c) => c.model),
+            reviewModels: reviewConfigsUnique.map((c) => c.model),
             agentsRegistered: agentKeys,
             commandsRegistered: commandKeys,
           },
           "DesignLab agents and commands registered",
         );
       } else {
-        logger.info(
-          { command: "design-lab:init" },
-          "DesignLab init command registered (config missing)",
+        logger.warn(
+          "DesignLab config not found; design commands will prompt to run /design-lab:init",
         );
       }
     },
   };
 };
 
-function uniqueModels(models: string[]): string[] {
+function uniqueNormalizedConfigs(
+  configs: { model: string; variant: string }[],
+): { model: string; variant: string }[] {
   const seen = new Set<string>();
-  return models.filter((model) => {
-    if (seen.has(model)) {
+  return configs.filter((cfg) => {
+    if (seen.has(cfg.model)) {
       return false;
     }
-    seen.add(model);
+    seen.add(cfg.model);
     return true;
   });
 }
 
 type ModelSpec = {
   model: string;
+  variant: string;
   agentName: string;
   fileStem: string;
 };

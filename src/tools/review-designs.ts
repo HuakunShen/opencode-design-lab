@@ -85,7 +85,8 @@ Use this after generate_designs to evaluate and compare the generated designs.`,
       const requirements = taskData.requirements;
 
       // Run reviews in parallel
-      const reviewPromises = reviewModels.map(async (model) => {
+      const reviewPromises = reviewModels.map(async (modelConfig) => {
+        const model = typeof modelConfig === "string" ? modelConfig : modelConfig.model;
         try {
           const { review, scores } = await generateReview(
             ctx,

@@ -1,15 +1,3 @@
-type ModelSpec = {
-  model: string;
-  agentName: string;
-  fileStem: string;
-};
-
-type CommandOptions = {
-  baseOutputDir: string;
-  designModels: ModelSpec[];
-  reviewModels: ModelSpec[];
-};
-
 type CommandConfig = {
   template: string;
   description?: string;
@@ -42,8 +30,9 @@ Create a new design-lab.json file at: ${baseDir}/.opencode/design-lab.json
    - Copy the bundled template to ${baseDir}/.opencode/design-lab.json
    - Report success and show the path to the created file
 
-Here is a template
+Here is a template (with $schema for IDE validation):
 {
+  "$schema": "https://raw.githubusercontent.com/HuakunShen/opencode-design-lab/main/schemas/design-lab-config.schema.json",
   "design_models": [
     "opencode/kimi-k2.5-free",
     "zhipuai-coding-plan/glm-4.7",
@@ -62,6 +51,10 @@ Here is a template
   "design_agent_temperature": 0.7,
   "review_agent_temperature": 0.1
 }
+
+Each model can also be an object to set a variant:
+{ "model": "opencode/kimi-k2.6", "variant": "max" }
+Valid variants: "low", "medium", "high", "max" (default: "max").
 `,
   };
 }
@@ -73,11 +66,7 @@ Here is a template
  * Triggers the full design generation workflow — creates a run directory,
  * delegates to all model subagents, and produces design files.
  */
-export function buildDesignCommand(options: CommandOptions): CommandConfig {
-  const designList = options.designModels
-    .map((spec) => `- ${spec.agentName} → designs/${spec.fileStem}.md`)
-    .join("\n");
-
+export function buildDesignCommand(directory: string): CommandConfig {
   return {
     description:
       "Generate design proposals from all configured models for a given topic",
@@ -86,14 +75,28 @@ export function buildDesignCommand(options: CommandOptions): CommandConfig {
 
 $input
 
+## Config Loading (MUST DO FIRST)
+
+1. Read the Design Lab config from these paths in order:
+   - ${directory}/.opencode/design-lab.json
+   - ${directory}/.opencode/design-lab.jsonc
+   - ~/.config/opencode/design-lab.json
+   - ~/.config/opencode/design-lab.jsonc
+2. If no valid config is found at any of these paths, STOP and report:
+   "Design Lab config not found or invalid. Run /design-lab:init to create one."
+3. Extract \`base_output_dir\` and \`design_models\` from the config.
+
 ## Instructions
 
-1. Create a run directory: ${options.baseOutputDir}/YYYY-MM-DD-<topic-slug>/
+1. Create a run directory: <base_output_dir>/YYYY-MM-DD-<topic-slug>/
    Use today's date and a short hyphenated slug derived from the topic.
 2. Create subdirectory: designs/
-3. Delegate design generation to each subagent in parallel:
-${designList}
-4. Fire all delegate_task calls simultaneously - do NOT wait for each to complete before starting the next.
+3. For each model in \`design_models\`, derive:
+   - agentName: "designer_model_" + model name (replace non-alphanumeric characters with underscores)
+   - fileStem: model name (replace non-alphanumeric characters with hyphens)
+   - outputFile: <runDir>/designs/<fileStem>.md
+4. Use delegate_task to delegate to ALL design subagents simultaneously.
+   Do NOT wait for each to complete before starting the next — fire all at once.
 5. Each subagent must write its design to the specified output_file path.
 6. Wait for ALL subagents to complete, then report the run directory and list of generated files.
 
@@ -107,35 +110,46 @@ Do NOT run reviews. Only generate designs.`,
  * Usage: /review [run-directory]
  * Triggers cross-review of existing designs. If no directory is given,
  * finds the most recent run under the base output directory.
+ *
+ * @param directory - Project directory for config resolution at execution time
  */
-export function buildReviewCommand(options: CommandOptions): CommandConfig {
-  const reviewList = options.reviewModels
-    .map((spec) => `- ${spec.agentName} → reviews/review-${spec.fileStem}.md`)
-    .join("\n");
-
+export function buildReviewCommand(directory: string): CommandConfig {
   return {
     description:
       "Run cross-reviews on existing designs using all configured review models",
     agent: "designer",
     template: `Run cross-reviews on existing designs.
- 
- $input
- 
- ## Instructions
- 
- 1. If a run directory is specified above, use it. Otherwise, find the most
-    recent run directory under ${options.baseOutputDir}/ (sort by date prefix).
- 2. Read all design files from the designs/ subdirectory.
- 3. Create subdirectory: reviews/ (if it doesn't exist).
- 4. Delegate review tasks to each review subagent in parallel:
- ${reviewList}
- 5. Fire all delegate_task calls simultaneously - do NOT wait for each to complete before starting the next.
- 6. Each reviewer must read ALL designs and produce ONE comparative markdown
-    report written to its output_file path.
- 7. Wait for ALL review subagents to complete, then read the reviews and produce a summary:
-    - Which design is recommended overall
-    - Approximate scores per design
-    - Notable disagreements between reviewers`,
+
+$input
+
+## Config Loading (MUST DO FIRST)
+
+1. Read the Design Lab config from these paths in order:
+   - ${directory}/.opencode/design-lab.json
+   - ${directory}/.opencode/design-lab.jsonc
+   - ~/.config/opencode/design-lab.json
+   - ~/.config/opencode/design-lab.jsonc
+2. If no valid config is found, STOP and report: "Design Lab config not found or invalid. Run /design-lab:init to create one."
+3. Extract \`base_output_dir\` from the config.
+4. Use \`review_models\` if specified, otherwise fallback to \`design_models\`.
+
+## Instructions
+
+1. If a run directory is specified above, use it. Otherwise, find the most
+   recent run directory under <base_output_dir from config>/ (sort by date prefix).
+2. Read all design files from the designs/ subdirectory.
+3. Create subdirectory: reviews/ (if it doesn't exist).
+4. For each model in review_models (or design_models), derive:
+   - agentName: "designer_model_" + model name (replace non-alphanumeric with underscores)
+   - fileStem: model name (replace non-alphanumeric with hyphens)
+   - outputFile: <runDir>/reviews/review-<fileStem>.md
+5. Use delegate_task to delegate to ALL review subagents simultaneously.
+   Do NOT wait for each to complete before starting the next.
+6. Each reviewer must read ALL designs and produce ONE comparative markdown report.
+7. Wait for ALL review subagents to complete, then read the reviews and produce a summary:
+   - Which design is recommended overall
+   - Approximate scores per design
+   - Notable disagreements between reviewers`,
   };
 }
 
@@ -146,7 +160,7 @@ export function buildReviewCommand(options: CommandOptions): CommandConfig {
  * Synthesizes reviews and scores into a final qualitative report.
  * If no directory is given, finds the most recent run under the base output directory.
  */
-export function buildSynthesizeCommand(options: CommandOptions): CommandConfig {
+export function buildSynthesizeCommand(directory: string): CommandConfig {
   return {
     description: "Synthesize reviews into final qualitative report",
     agent: "designer",
@@ -154,10 +168,20 @@ export function buildSynthesizeCommand(options: CommandOptions): CommandConfig {
 
 $input
 
+## Config Loading (MUST DO FIRST)
+
+1. Read the Design Lab config from these paths in order:
+   - ${directory}/.opencode/design-lab.json
+   - ${directory}/.opencode/design-lab.jsonc
+   - ~/.config/opencode/design-lab.json
+   - ~/.config/opencode/design-lab.jsonc
+2. If no valid config is found, STOP and report: "Design Lab config not found or invalid. Run /design-lab:init to create one."
+3. Extract \`base_output_dir\` from the config.
+
 ## Instructions
 
 1. If a run directory is specified above, use it. Otherwise, find the most
-   recent run directory under ${options.baseOutputDir}/ (sort by date prefix).
+   recent run directory under <base_output_dir from config>/ (sort by date prefix).
 2. Read all review files from the reviews/ subdirectory.
 3. Read all score files from the scores/ subdirectory.
 4. Perform qualitative synthesis:
