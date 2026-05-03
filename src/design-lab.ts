@@ -42,6 +42,7 @@ export const DesignLab: Plugin = async (ctx) => {
         ...(config.command ?? {}),
         "design-lab:init": buildInitCommand(ctx.directory),
         "design-lab:journal": buildJournalCommand(),
+        "design-lab:repowiki": buildRepowikiCommand(ctx.directory),
       };
 
       // Only register agents and other commands if config exists
@@ -102,7 +103,6 @@ export const DesignLab: Plugin = async (ctx) => {
             designModels: designSpecs,
             reviewModels: reviewSpecs,
           }),
-          "design-lab:repowiki": buildRepowikiCommand(ctx.directory),
         };
 
         const agentKeys = Object.keys(config.agent ?? {});
