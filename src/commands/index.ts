@@ -90,7 +90,9 @@ $input
 
 1. Create a run directory: <base_output_dir>/YYYY-MM-DD-<topic-slug>/
    Use today's date and a short hyphenated slug derived from the topic.
-2. Create subdirectory: designs/
+2. Create subdirectories:
+   - designs/
+   - blinds/designs-blind/
 3. For each model in \`design_models\`, derive:
    - agentName: "designer_model_" + model name (replace non-alphanumeric characters with underscores)
    - fileStem: model name (replace non-alphanumeric characters with hyphens)
@@ -99,8 +101,9 @@ $input
    Do NOT wait for each to complete before starting the next — fire all at once.
 5. Each subagent must write its design to the specified output_file path.
 6. Wait for ALL subagents to complete, then report the run directory and list of generated files.
+7. SET UP BLIND COPIES: After all designs are generated, create anonymized copies in blinds/designs-blind/ so reviews can be double-blind. Follow the blind setup procedure from your system prompt (Step 4: BLIND SETUP).
 
-Do NOT run reviews. Only generate designs.`,
+Do NOT run reviews. Only generate designs and set up blind copies.`,
   };
 }
 
@@ -137,7 +140,13 @@ $input
 
 1. If a run directory is specified above, use it. Otherwise, find the most
    recent run directory under <base_output_dir from config>/ (sort by date prefix).
-2. Read all design files from the designs/ subdirectory.
+2. ENSURE BLIND COPIES EXIST:
+   - Check if blinds/designs-blind/ directory exists and has design files.
+   - If NOT, create blind copies now (follow Step 4 from your system prompt):
+     a. Create blinds/designs-blind/ directory
+     b. Read each design from designs/, strip model identity, write to blinds/designs-blind/design-{letter}.md
+     c. Create blinds/mapping.json
+   - If blinds already exist, verify they match the designs/ directory (recreate if designs were revised).
 3. Create subdirectory: reviews/ (if it doesn't exist).
 4. For each model in review_models (or design_models), derive:
    - agentName: "designer_model_" + model name (replace non-alphanumeric with underscores)
@@ -145,9 +154,10 @@ $input
    - outputFile: <runDir>/reviews/review-<fileStem>.md
 5. Use delegate_task to delegate to ALL review subagents simultaneously.
    Do NOT wait for each to complete before starting the next.
-6. Each reviewer must read ALL designs and produce ONE comparative markdown report.
-7. Wait for ALL review subagents to complete, then read the reviews and produce a summary:
-   - Which design is recommended overall
+6. Each reviewer must read ALL designs from blinds/designs-blind/ (anonymous copies — they see design-a.md, design-b.md, etc.).
+   They produce ONE comparative markdown report. Reviewers MUST NOT receive actual model names.
+7. Wait for ALL review subagents to complete, then use blinds/mapping.json to produce a summary with real model names:
+   - Which design (by real model name) is recommended overall
    - Approximate scores per design
    - Notable disagreements between reviewers`,
   };
@@ -182,20 +192,23 @@ $input
 
 1. If a run directory is specified above, use it. Otherwise, find the most
    recent run directory under <base_output_dir from config>/ (sort by date prefix).
-2. Read all review files from the reviews/ subdirectory.
-3. Read all score files from the scores/ subdirectory.
-4. Perform qualitative synthesis:
+2. Read blinds/mapping.json to get the blind-to-model mapping.
+3. Read all review files from the reviews/ subdirectory.
+4. Read all score files from the scores/ subdirectory.
+5. Perform qualitative synthesis:
    - Analyze patterns across all reviews
    - Identify consensus and disagreements
    - Synthesize scores with qualitative insights
    - Determine overall recommendations
-5. Write the final synthesis report to final-report.md with the following sections:
+   - USE REAL MODEL NAMES from the mapping — never refer to designs by their blind labels (design-a, design-b) in the final report.
+6. Write the final synthesis report to final-report.md with the following sections:
    - Executive Summary
-   - Design Comparison Matrix
+   - Design Comparison Matrix (with real model names from mapping)
    - Qualitative Analysis
    - Consensus Findings
    - Recommendations
-   - Appendix (detailed scores and review excerpts)`,
+   - Appendix: Blind Identity Mapping (copy the mapping table from blinds/mapping.json for full transparency)
+   - Appendix: Detailed scores and review excerpts`,
   };
 }
 

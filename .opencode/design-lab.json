@@ -1,12 +1,14 @@
 {
   "$schema": "https://raw.githubusercontent.com/HuakunShen/opencode-design-lab/main/schemas/design-lab-config.schema.json",
   "design_models": [
-    { "model": "opencode/kimi-k2.6", "variant": "max" },
-    { "model": "opencode/kimi-k2.5", "variant": "max" }
+    "kimi-for-coding/k2p6",
+    "deepseek/deepseek-v4-flash",
+    "deepseek/deepseek-v4-pro"
   ],
   "review_models": [
-    { "model": "opencode/kimi-k2.6", "variant": "high" },
-    { "model": "opencode/kimi-k2.5", "variant": "high" }
+    "kimi-for-coding/k2p6",
+    "deepseek/deepseek-v4-flash",
+    "deepseek/deepseek-v4-pro"
   ],
   "base_output_dir": ".design-lab",
   "design_agent_temperature": 0.7,

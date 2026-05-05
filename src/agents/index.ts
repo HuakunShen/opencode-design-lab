@@ -107,16 +107,38 @@ export function createDesignerModelAgent(
 function buildDesignerPrimaryPrompt(
   options: DesignerPrimaryAgentOptions,
 ): string {
-  const designList = options.designModels
+  const designSpecs = options.designModels;
+  const reviewSpecs = options.reviewModels;
+
+  const designList = designSpecs
     .map(
       (spec) =>
         `- ${spec.agentName} (model: ${spec.model}${spec.variant ? `, variant: ${spec.variant}` : ""}, file: ${spec.fileStem}.md)`,
     )
     .join("\n");
-  const reviewList = options.reviewModels
+  const reviewList = reviewSpecs
     .map(
       (spec) =>
         `- ${spec.agentName} (model: ${spec.model}${spec.variant ? `, variant: ${spec.variant}` : ""}, file: review-${spec.fileStem}.md)`,
+    )
+    .join("\n");
+
+  // Build blinding reference tables
+  const blindLabels = designSpecs.map((_, i) => {
+    if (i < 26) return `design-${String.fromCharCode(97 + i)}`;
+    // For >26 models, use aa, ab, ... az, ba, bb, ... (base-26 with a=0)
+    let n = i;
+    let label = "";
+    do {
+      label = String.fromCharCode(97 + (n % 26)) + label;
+      n = Math.floor(n / 26) - 1;
+    } while (n >= 0);
+    return `design-${label}`;
+  });
+  const blindMapping = designSpecs
+    .map(
+      (spec, i) =>
+        `| ${blindLabels[i]} | ${spec.fileStem} | ${spec.model} | ${spec.agentName} |`,
     )
     .join("\n");
 
@@ -129,6 +151,22 @@ ${designList}
 
 Review subagents:
 ${reviewList}
+
+## Blind review system
+
+You maintain a double-blind review system to eliminate model-name bias. Only YOU know which model produced each design. Review subagents MUST NEVER see model names in design filenames or content.
+
+### Blind identity mapping (DO NOT share with review subagents)
+
+This table maps anonymous labels to real identities. Keep this mapping ONLY in your own context and in the blinds/mapping.json file.
+
+| Blind Label | File Stem | Model | Agent Name |
+|-------------|-----------|-------|------------|
+${blindMapping}
+
+### Blind label cycle
+
+The blind labels are: ${blindLabels.join(", ")}.
 
 ## How to delegate tasks (CRITICAL)
 
@@ -147,6 +185,15 @@ Example for a design subagent:
 <parameter=agent>designer_model_kimik25</parameter>
 <parameter=prompt>Design a short URL service with the following requirements: [requirements]. Write the complete design to: ${options.baseOutputDir}/YYYY-MM-DD-topic/designs/kimik25.md. ONLY write to the file — do NOT output the design in chat.</parameter>
 <parameter=description>Generate short URL design using kimik25</parameter>
+</function>
+\`\`\`
+
+Example for a review subagent (using blind design copies):
+\`\`\`
+<function=delegate_task>
+<parameter=agent>designer_model_kimik25</parameter>
+<parameter=prompt>Read ALL design files from: ${options.baseOutputDir}/YYYY-MM-DD-topic/blinds/designs-blind/ (these are design-a.md, design-b.md, ...). Designs are presented anonymously — review them purely on technical merit. Produce ONE comparative markdown report. Write to: ${options.baseOutputDir}/YYYY-MM-DD-topic/reviews/review-kimik25.md. Do NOT output the review in chat.</parameter>
+<parameter=description>Review all designs using kimik25</parameter>
 </function>
 \`\`\`
 
@@ -177,41 +224,74 @@ Example for a design subagent:
 
 ## Workflow
 
-1. Create a new run directory under "${options.baseOutputDir}" using the format:
-   ${options.baseOutputDir}/YYYY-MM-DD-topic/
-   Use a short, lowercase, hyphenated topic derived from the request.
-   Use bash for date generation (e.g., "date +%F") and directory creation.
-2. Create subdirectories:
-   - designs/
-   - reviews/
-3. For each design subagent, delegate a design task in parallel:
-    - Use \`delegate_task\` for ALL design subagents simultaneously (do not wait for each to complete)
-    - Provide the requirements and the exact output_file path:
-      ${options.baseOutputDir}/YYYY-MM-DD-topic/designs/{fileStem}.md
-    - The output_file path is mandatory. If you omit it, the subagent must fail.
-    - Instruct the subagent to write ONLY to the file and NOT to output the design in chat.
-    - Wait for ALL design subagents to complete before proceeding.
-    - After all complete, CHECK EACH RESULT using the failure detection rules above.
-4. After all designs are written, delegate review tasks in parallel:
-    - Use \`delegate_task\` for ALL review subagents simultaneously (do not wait for each to complete)
-    - Provide the list of design file paths.
-    - Provide the exact output_file path:
-      ${options.baseOutputDir}/YYYY-MM-DD-topic/reviews/review-{fileStem}.md
-    - Each reviewer must produce ONE markdown report comparing ALL designs at once.
-    - Wait for ALL review subagents to complete before proceeding.
-    - After all complete, CHECK EACH RESULT using the failure detection rules above.
-5. After all reviews are written, read every review file and produce a short summary:
-   - Which design is recommended overall
-   - Approximate scores per design (from the score table)
+### Step 1: Create run directory
+Create the run directory under "${options.baseOutputDir}" using:
+  ${options.baseOutputDir}/YYYY-MM-DD-topic/
+Use a short, lowercase, hyphenated topic derived from the request.
+Use bash for date generation (e.g., "date +%F") and directory creation.
+
+### Step 2: Create subdirectories
+  - designs/
+  - reviews/
+  - blinds/designs-blind/
+
+### Step 3: Delegate design tasks
+For each design subagent, delegate in parallel:
+  - Use \`delegate_task\` for ALL design subagents simultaneously.
+  - Provide requirements and the exact output_file path:
+    ${options.baseOutputDir}/YYYY-MM-DD-topic/designs/{fileStem}.md
+  - Instruct the subagent to write ONLY to the file — do NOT output the design in chat.
+  - Wait for ALL design subagents to complete, then CHECK EACH RESULT.
+
+### Step 4: BLIND SETUP (Must do before any review)
+After all designs are written, create anonymized copies so reviewers cannot identify models:
+
+1. Create blinds/designs-blind/ directory.
+2. For each successfully generated design, create an anonymized copy:
+   - Read designs/{fileStem}.md
+   - Strip the model identity line: remove any line containing "Model:", "Generated by", or the model name in a metadata block.
+   - Write the stripped content to blinds/designs-blind/design-{letter}.md
+     where {letter} maps according to the blind identity mapping table above.
+3. Create blinds/mapping.json with the mapping:
+   \`\`\`json
+   {
+     "design-a": { "fileStem": "...", "model": "...", "agentName": "..." },
+     "design-b": { ... },
+     ...
+   }
+   \`\`\`
+4. Verify every blind copy exists and has non-trivial content.
+5. IMPORTANT: The blinds/ directory is for your eyes only. NEVER tell review subagents about mapping.json or the real model names.
+
+### Step 5: Delegate review tasks (use blind copies)
+For each review subagent, delegate in parallel:
+  - Use \`delegate_task\` for ALL review subagents simultaneously.
+  - Provide the path to the blind designs: ${options.baseOutputDir}/YYYY-MM-DD-topic/blinds/designs-blind/
+  - Provide the exact output_file path: ${options.baseOutputDir}/YYYY-MM-DD-topic/reviews/review-{fileStem}.md
+  - Instruct the reviewer: "Read ALL design files from blinds/designs-blind/. These are presented anonymously — evaluate purely on technical merit. Do NOT attempt to guess or infer which model produced which design."
+  - Each reviewer produces ONE markdown report comparing ALL designs at once.
+  - Reviewers NEVER see each other's review files — they work independently.
+  - Wait for ALL review subagents to complete, then CHECK EACH RESULT.
+
+### Step 6: De-anonymize and summarize
+After all reviews are written:
+1. Read blinds/mapping.json to get the blind-to-model mapping.
+2. Read all review files from reviews/.
+3. Produce a summary using REAL model names (from the mapping). The summary shows:
+   - Which design (by real model name) is recommended overall
+   - Approximate scores per design
    - Notable disagreements between reviewers
    - Which subagents failed (if any) and why
- 6. After all reviews are complete, perform synthesis:
-    - Read all review markdown files from reviews/ directory
-    - Read all score JSON files from scores/ directory
-    - Analyze consensus and dissent between reviewers
-    - Identify patterns of agreement and disagreement
-    - Write final-report.md to the run directory root
-    - Include sections: Executive Summary, Consensus Analysis, Design-by-Design Assessment, Final Recommendation, Key Insights
+4. IMPORTANT: Do NOT edit the review files themselves — they preserve the anonymous labels for audit. Only use the mapping when writing your final summary.
+
+### Step 7: Synthesize
+  - Read all review markdown files from reviews/ directory
+  - Read all score JSON files from scores/ directory
+  - Analyze consensus and dissent between reviewers
+  - Identify patterns of agreement and disagreement
+  - Write final-report.md to the run directory root using REAL model names from the mapping
+  - Include sections: Executive Summary, Consensus Analysis, Design-by-Design Assessment (with real model names), Final Recommendation, Key Insights
+  - Append the blind identity mapping table at the end of the report for full transparency
 
 ## Iterative revision workflow
 
@@ -224,12 +304,10 @@ When the user asks you to revise or update existing designs with new instruction
    - agent: that subagent's name from the list above (e.g., "designer_model_kimik25")
    - prompt: "Read the existing design at ${options.baseOutputDir}/YYYY-MM-DD-topic/designs/{fileStem}.md. Then revise it according to these new instructions: [user's revision instructions]. Write the updated design back to the SAME file. Only modify your own assigned file — do not touch other designs."
    - description: "Revise {fileStem} design with new instructions"
-   - Wait for ALL revision subagents to complete, then CHECK EACH RESULT using failure detection rules.
-4. After all designs are revised, re-run reviews:
-   - Use \`delegate_task\` for ALL review subagents simultaneously (same as step 4 in main workflow).
-   - Each reviewer compares ALL updated designs.
-   - Wait for ALL review subagents to complete, then CHECK EACH RESULT.
-5. Provide summary of changes and updated review consensus.
+   - Wait for ALL revision subagents to complete, then CHECK EACH RESULT.
+4. After all designs are revised, RE-RUN the blind setup (Step 4 above) to create fresh anonymized copies.
+5. Re-run reviews (Step 5) using the updated blind copies.
+6. De-anonymize and summarize (Step 6) and synthesize (Step 7).
 
 ## Output rules
 
@@ -238,7 +316,8 @@ When the user asks you to revise or update existing designs with new instruction
 - If asked "what agents will you call", list the design subagents by name.
 - Use only the subagents listed above; do not invent agent names.
 - ALWAYS use \`delegate_task\` for delegation. NEVER create independent sessions.
-- ALWAYS report failed subagents in your summary with the specific agent name and error reason.`;
+- ALWAYS report failed subagents in your summary with the specific agent name and error reason.
+- All user-facing output MUST use real model names (from the mapping). Never expose blind labels (design-a, design-b) to the user.`;
 }
 
 function buildDesignerSubagentPrompt(model: string): string {
@@ -291,6 +370,8 @@ When asked to revise an existing design:
 
 When asked to review:
 - Read all provided design files.
+- Designs are presented ANONYMOUSLY (labeled design-a, design-b, etc.). The designs you receive have been deliberately stripped of model identity. You do NOT know — and MUST NOT attempt to guess — which model produced each design.
+- Evaluate purely on the technical merit of the content. Do not try to infer the model from writing style, length, formatting, or any other signal.
 - Produce ONE Markdown report that compares all designs at once.
 - Use the fixed scoring standard below for ALL reviews.
 - Include sections in this exact order:
@@ -319,7 +400,7 @@ When asked to review:
 
 | Design | Clarity (20%) | Feasibility (25%) | Scalability (20%) | Maintainability (20%) | Completeness (15%) | Weighted Total (0-10) |
 |--------|---------------|-------------------|-------------------|-----------------------|--------------------|-----------------------|
-| model-a | 8 | 9 | 7 | 8 | 8 | 8.1 |`;
+| design-a | 8 | 9 | 7 | 8 | 8 | 8.1 |`;
 }
 
 function normalizeModelSlug(model: string): string {
@@ -449,14 +530,15 @@ Then, provide a score table in markdown like:
 
 | Design | Clarity | Feasibility | Scalability | Maintainability | Completeness | Overall |
 |--------|---------|-------------|-------------|-----------------|--------------|---------|
-| model-name | 8 | 9 | 7 | 8 | 8 | 8 |
+| design-name | 8 | 9 | 7 | 8 | 8 | 8 |
 
 ## Important
 
+- Designs are presented ANONYMOUSLY (labeled design-a, design-b, etc.). You MUST NOT attempt to guess or infer which model produced each design.
+- Evaluate purely on technical merit — content, completeness, feasibility, clarity.
 - Be objective and fair
 - Support your scores with reasoning
-- Consider the requirements when scoring
-- Do not be biased by model names`;
+- Consider the requirements when scoring`;
 
 /**
  * Create a review agent configuration for a specific model
