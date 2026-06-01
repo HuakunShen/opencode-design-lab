@@ -33,182 +33,51 @@ Create a new design-lab.json file at: ${baseDir}/.opencode/design-lab.json
 Here is a template (with $schema for IDE validation):
 {
   "$schema": "https://raw.githubusercontent.com/HuakunShen/opencode-design-lab/main/schemas/design-lab-config.schema.json",
-  "design_models": [
-    "opencode/kimi-k2.5-free",
-    "zhipuai-coding-plan/glm-4.7",
-    "openai/gpt-5.2-codex",
-    "google/antigravity-gemini-3-pro",
-    "anthropic/claude-opus-4-5"
+  "models": [
+    { "model": "openai/gpt-5.2-codex", "variant": "xhigh" },
+    { "model": "opencode/kimi-k2.5-free", "variant": "max" },
+    { "model": "zhipuai-coding-plan/glm-4.7", "variant": "max" },
+    { "model": "google/antigravity-gemini-3-pro", "variant": "max" },
+    { "model": "local/model-without-variant", "variant": null }
   ],
-  "review_models": [
-    "opencode/kimi-k2.5-free",
-    "zhipuai-coding-plan/glm-4.7",
-    "openai/gpt-5.2-codex",
-    "google/antigravity-gemini-3-pro",
-    "anthropic/claude-opus-4-5"
-  ],
-  "base_output_dir": ".design-lab",
-  "design_agent_temperature": 0.7,
-  "review_agent_temperature": 0.1
+  "default_variant": "max",
+  "base_output_dir": ".design-lab"
 }
 
-Each model can also be an object to set a variant:
-{ "model": "opencode/kimi-k2.6", "variant": "max" }
-Valid variants: "low", "medium", "high", "max" (default: "max").
+Each model can be a string or an object with a variant. Variants are passed through
+as configured, so provider-specific values like "xhigh" are supported. Use
+"variant": null for models that should be invoked without a variant.
 `,
   };
 }
 
 /**
- * Build the `/design` command configuration.
+ * Build the `/ask` command configuration.
  *
- * Usage: /design <topic>
- * Triggers the full design generation workflow — creates a run directory,
- * delegates to all model subagents, and produces design files.
+ * Usage: /design-lab:ask <prompt>
+ * Routes the prompt to the unified Design Lab coordinator.
  */
-export function buildDesignCommand(directory: string): CommandConfig {
+export function buildAskCommand(directory: string): CommandConfig {
   return {
     description:
-      "Generate design proposals from all configured models for a given topic",
-    agent: "designer",
-    template: `Generate designs for the following topic:
+      "Run a Design Lab single-agent workflow for multi-model asks, plans, revisions, or reviews",
+    agent: "design_lab",
+    template: `Run the Design Lab single-agent workflow for this prompt:
 
 $input
 
 ## Config Loading (MUST DO FIRST)
 
-1. Read the Design Lab config from these paths in order:
+1. Read the project Design Lab config from these paths in order:
    - ${directory}/.opencode/design-lab.json
    - ${directory}/.opencode/design-lab.jsonc
-   - ~/.config/opencode/design-lab.json
-   - ~/.config/opencode/design-lab.jsonc
-2. If no valid config is found at any of these paths, STOP and report:
-   "Design Lab config not found or invalid. Run /design-lab:init to create one."
-3. Extract \`base_output_dir\` and \`design_models\` from the config.
+2. If no valid config is found, STOP and report:
+    "Design Lab config not found or invalid. Run /design-lab:init to create one."
+3. Extract \`models\`, \`default_variant\`, and \`base_output_dir\`.
 
 ## Instructions
 
-1. Create a run directory: <base_output_dir>/YYYY-MM-DD-<topic-slug>/
-   Use today's date and a short hyphenated slug derived from the topic.
-2. Create subdirectories:
-   - designs/
-   - blinds/designs-blind/
-3. For each model in \`design_models\`, derive:
-   - agentName: "designer_model_" + model name (replace non-alphanumeric characters with underscores)
-   - fileStem: model name (replace non-alphanumeric characters with hyphens)
-   - outputFile: <runDir>/designs/<fileStem>.md
-4. Use delegate_task to delegate to ALL design subagents simultaneously.
-   Do NOT wait for each to complete before starting the next — fire all at once.
-5. Each subagent must write its design to the specified output_file path.
-6. Wait for ALL subagents to complete, then report the run directory and list of generated files.
-7. SET UP BLIND COPIES: After all designs are generated, create anonymized copies in blinds/designs-blind/ so reviews can be double-blind. Follow the blind setup procedure from your system prompt (Step 4: BLIND SETUP).
-
-Do NOT run reviews. Only generate designs and set up blind copies.`,
-  };
-}
-
-/**
- * Build the `/review` command configuration.
- *
- * Usage: /review [run-directory]
- * Triggers cross-review of existing designs. If no directory is given,
- * finds the most recent run under the base output directory.
- *
- * @param directory - Project directory for config resolution at execution time
- */
-export function buildReviewCommand(directory: string): CommandConfig {
-  return {
-    description:
-      "Run cross-reviews on existing designs using all configured review models",
-    agent: "designer",
-    template: `Run cross-reviews on existing designs.
-
-$input
-
-## Config Loading (MUST DO FIRST)
-
-1. Read the Design Lab config from these paths in order:
-   - ${directory}/.opencode/design-lab.json
-   - ${directory}/.opencode/design-lab.jsonc
-   - ~/.config/opencode/design-lab.json
-   - ~/.config/opencode/design-lab.jsonc
-2. If no valid config is found, STOP and report: "Design Lab config not found or invalid. Run /design-lab:init to create one."
-3. Extract \`base_output_dir\` from the config.
-4. Use \`review_models\` if specified, otherwise fallback to \`design_models\`.
-
-## Instructions
-
-1. If a run directory is specified above, use it. Otherwise, find the most
-   recent run directory under <base_output_dir from config>/ (sort by date prefix).
-2. ENSURE BLIND COPIES EXIST:
-   - Check if blinds/designs-blind/ directory exists and has design files.
-   - If NOT, create blind copies now (follow Step 4 from your system prompt):
-     a. Create blinds/designs-blind/ directory
-     b. Read each design from designs/, strip model identity, write to blinds/designs-blind/design-{letter}.md
-     c. Create blinds/mapping.json
-   - If blinds already exist, verify they match the designs/ directory (recreate if designs were revised).
-3. Create subdirectory: reviews/ (if it doesn't exist).
-4. For each model in review_models (or design_models), derive:
-   - agentName: "designer_model_" + model name (replace non-alphanumeric with underscores)
-   - fileStem: model name (replace non-alphanumeric with hyphens)
-   - outputFile: <runDir>/reviews/review-<fileStem>.md
-5. Use delegate_task to delegate to ALL review subagents simultaneously.
-   Do NOT wait for each to complete before starting the next.
-6. Each reviewer must read ALL designs from blinds/designs-blind/ (anonymous copies — they see design-a.md, design-b.md, etc.).
-   They produce ONE comparative markdown report. Reviewers MUST NOT receive actual model names.
-7. Wait for ALL review subagents to complete, then use blinds/mapping.json to produce a summary with real model names:
-   - Which design (by real model name) is recommended overall
-   - Approximate scores per design
-   - Notable disagreements between reviewers`,
-  };
-}
-
-/**
- * Build the `/synthesize` command configuration.
- *
- * Usage: /synthesize [run-directory]
- * Synthesizes reviews and scores into a final qualitative report.
- * If no directory is given, finds the most recent run under the base output directory.
- */
-export function buildSynthesizeCommand(directory: string): CommandConfig {
-  return {
-    description: "Synthesize reviews into final qualitative report",
-    agent: "designer",
-    template: `Synthesize reviews and scores into a final qualitative report.
-
-$input
-
-## Config Loading (MUST DO FIRST)
-
-1. Read the Design Lab config from these paths in order:
-   - ${directory}/.opencode/design-lab.json
-   - ${directory}/.opencode/design-lab.jsonc
-   - ~/.config/opencode/design-lab.json
-   - ~/.config/opencode/design-lab.jsonc
-2. If no valid config is found, STOP and report: "Design Lab config not found or invalid. Run /design-lab:init to create one."
-3. Extract \`base_output_dir\` from the config.
-
-## Instructions
-
-1. If a run directory is specified above, use it. Otherwise, find the most
-   recent run directory under <base_output_dir from config>/ (sort by date prefix).
-2. Read blinds/mapping.json to get the blind-to-model mapping.
-3. Read all review files from the reviews/ subdirectory.
-4. Read all score files from the scores/ subdirectory.
-5. Perform qualitative synthesis:
-   - Analyze patterns across all reviews
-   - Identify consensus and disagreements
-   - Synthesize scores with qualitative insights
-   - Determine overall recommendations
-   - USE REAL MODEL NAMES from the mapping — never refer to designs by their blind labels (design-a, design-b) in the final report.
-6. Write the final synthesis report to final-report.md with the following sections:
-   - Executive Summary
-   - Design Comparison Matrix (with real model names from mapping)
-   - Qualitative Analysis
-   - Consensus Findings
-   - Recommendations
-   - Appendix: Blind Identity Mapping (copy the mapping table from blinds/mapping.json for full transparency)
-   - Appendix: Detailed scores and review excerpts`,
+Use your system prompt's single-agent workflow. It supports general asks, plan generation, plan revision, anonymous plan review, and current-code review. Save full model outputs to files and return a concise synthesis in chat.`,
   };
 }
 
@@ -224,7 +93,7 @@ export function buildRepowikiCommand(_baseDir: string): CommandConfig {
   return {
     description:
       "Generate comprehensive repository wiki documentation with architecture diagrams and source citations",
-    agent: "designer",
+    agent: "design_lab",
     template: `Generate comprehensive repository documentation (repowiki) for this codebase.
 
 ## User Input

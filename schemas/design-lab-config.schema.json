@@ -5,7 +5,7 @@
     "$schema": {
       "type": "string"
     },
-    "design_models": {
+    "models": {
       "minItems": 2,
       "type": "array",
       "items": {
@@ -22,61 +22,37 @@
                 "description": "Model identifier (e.g. 'opencode/kimi-k2.6')"
               },
               "variant": {
-                "default": "max",
-                "description": "Reasoning effort variant",
-                "type": "string",
-                "enum": [
-                  "low",
-                  "medium",
-                  "high",
-                  "max"
+                "description": "Optional model variant. Use null to omit variant for this model.",
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  {
+                    "type": "null"
+                  }
                 ]
               }
             },
             "required": [
-              "model",
-              "variant"
+              "model"
             ],
             "additionalProperties": false
           }
         ]
       }
     },
-    "review_models": {
-      "type": "array",
-      "items": {
-        "anyOf": [
-          {
-            "type": "string",
-            "description": "Model identifier (e.g. 'opencode/kimi-k2.6')"
-          },
-          {
-            "type": "object",
-            "properties": {
-              "model": {
-                "type": "string",
-                "description": "Model identifier (e.g. 'opencode/kimi-k2.6')"
-              },
-              "variant": {
-                "default": "max",
-                "description": "Reasoning effort variant",
-                "type": "string",
-                "enum": [
-                  "low",
-                  "medium",
-                  "high",
-                  "max"
-                ]
-              }
-            },
-            "required": [
-              "model",
-              "variant"
-            ],
-            "additionalProperties": false
-          }
-        ]
-      }
+    "default_variant": {
+      "default": "max",
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
     "base_output_dir": {
       "default": ".design-lab",
@@ -99,7 +75,8 @@
     }
   },
   "required": [
-    "design_models",
+    "models",
+    "default_variant",
     "base_output_dir",
     "design_agent_temperature",
     "review_agent_temperature"

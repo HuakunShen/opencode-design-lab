@@ -3,26 +3,27 @@ import type { AgentConfig } from "@opencode-ai/sdk";
 import type { ModelConfig } from "../config/schema";
 import { getModelShortName } from "../utils/session-helpers";
 
-const DESIGNER_SUBAGENT_PREFIX = "designer_model_";
+const DESIGN_LAB_SUBAGENT_PREFIX = "design_lab_model_";
 
-type DesignerModelSpec = {
+type ModelVariant = string | null;
+
+type DesignLabModelSpec = {
   model: string;
-  variant?: string;
+  variant: ModelVariant;
   agentName: string;
   fileStem: string;
 };
 
-type DesignerPrimaryAgentOptions = {
+type DesignLabPrimaryAgentOptions = {
   baseOutputDir: string;
-  designModels: DesignerModelSpec[];
-  reviewModels: DesignerModelSpec[];
+  models: DesignLabModelSpec[];
 };
 
 /**
- * Build the agent name for a designer subagent model.
+ * Build the agent name for a unified Design Lab model subagent.
  */
-export function getDesignerSubagentName(model: string): string {
-  return `${DESIGNER_SUBAGENT_PREFIX}${normalizeAgentSuffix(model)}`;
+export function getDesignLabSubagentName(model: string): string {
+  return `${DESIGN_LAB_SUBAGENT_PREFIX}${normalizeAgentSuffix(model)}`;
 }
 
 /**
@@ -36,58 +37,74 @@ export function getDesignerModelFileStem(model: string): string {
  * Normalize a ModelConfig (string or object) to { model, variant }.
  * String entries get default variant "max".
  */
+export function normalizeModelConfig(config: ModelConfig): {
+  model: string;
+  variant: ModelVariant;
+};
 export function normalizeModelConfig(
   config: ModelConfig,
-): { model: string; variant: string } {
+  defaultVariant: ModelVariant,
+): {
+  model: string;
+  variant: ModelVariant;
+};
+export function normalizeModelConfig(
+  config: ModelConfig,
+  defaultVariant: ModelVariant = "max",
+): {
+  model: string;
+  variant: ModelVariant;
+} {
   if (typeof config === "string") {
-    return { model: config, variant: "max" };
+    return { model: config, variant: defaultVariant };
   }
-  return { model: config.model, variant: config.variant ?? "max" };
+  return {
+    model: config.model,
+    variant: config.variant === undefined ? defaultVariant : config.variant,
+  };
 }
 
 /**
- * Create the primary designer agent configuration.
+ * Create the unified Design Lab primary agent configuration.
  */
-export function createDesignerPrimaryAgent(
-  options: DesignerPrimaryAgentOptions,
+export function createDesignLabPrimaryAgent(
+  options: DesignLabPrimaryAgentOptions,
 ): AgentConfig {
-  const primaryModel =
-    options.designModels[0]?.model ?? options.reviewModels[0]?.model;
-
   return {
-    description: "Design Lab coordinator that orchestrates model subagents.",
+    description:
+      "Design Lab coordinator for multi-model plans, reviews, and synthesis.",
     mode: "primary",
-    model: primaryModel,
-    prompt: buildDesignerPrimaryPrompt(options),
+    prompt: buildDesignLabPrimaryPrompt(options),
     tools: {
       read: true,
+      write: true,
       bash: true,
       delegate_task: true,
-      edit: true,
+      edit: false,
       task: false,
-      write: true,
     },
     permission: {
       bash: "allow",
-      edit: "deny",
+      edit: "allow",
       webfetch: "deny",
     },
   } as AgentConfig;
 }
 
 /**
- * Create a designer subagent configuration for a specific model.
+ * Create a unified Design Lab model subagent configuration.
  */
-export function createDesignerModelAgent(
+export function createDesignLabModelAgent(
   model: string,
-  variant?: string,
+  variant?: ModelVariant,
 ): AgentConfig {
   return {
-    description: "Design Lab subagent that writes designs or reviews to files.",
+    description:
+      "Design Lab model subagent that writes assigned plans or reviews to files.",
     mode: "subagent",
     model,
     ...(variant ? { variant } : {}),
-    prompt: buildDesignerSubagentPrompt(model),
+    prompt: buildDesignLabSubagentPrompt(model),
     tools: {
       read: true,
       write: true,
@@ -104,303 +121,148 @@ export function createDesignerModelAgent(
   } as AgentConfig;
 }
 
-function buildDesignerPrimaryPrompt(
-  options: DesignerPrimaryAgentOptions,
-): string {
-  const designSpecs = options.designModels;
-  const reviewSpecs = options.reviewModels;
+function buildDesignLabSubagentPrompt(model: string): string {
+  return `You are a Design Lab model subagent for model: ${model}.
 
-  const designList = designSpecs
-    .map(
-      (spec) =>
-        `- ${spec.agentName} (model: ${spec.model}${spec.variant ? `, variant: ${spec.variant}` : ""}, file: ${spec.fileStem}.md)`,
-    )
-    .join("\n");
-  const reviewList = reviewSpecs
-    .map(
-      (spec) =>
-        `- ${spec.agentName} (model: ${spec.model}${spec.variant ? `, variant: ${spec.variant}` : ""}, file: review-${spec.fileStem}.md)`,
-    )
-    .join("\n");
+You receive tasks only from the design_lab primary agent. Your job is to write one assigned artifact file.
 
-  // Build blinding reference tables
-  const blindLabels = designSpecs.map((_, i) => {
-    if (i < 26) return `design-${String.fromCharCode(97 + i)}`;
-    // For >26 models, use aa, ab, ... az, ba, bb, ... (base-26 with a=0)
-    let n = i;
-    let label = "";
-    do {
-      label = String.fromCharCode(97 + (n % 26)) + label;
-      n = Math.floor(n / 26) - 1;
-    } while (n >= 0);
-    return `design-${label}`;
-  });
-  const blindMapping = designSpecs
-    .map(
-      (spec, i) =>
-        `| ${blindLabels[i]} | ${spec.fileStem} | ${spec.model} | ${spec.agentName} |`,
-    )
-    .join("\n");
+## Rules
 
-  return `You are the Design Lab primary agent. Your job is to orchestrate model subagents to produce design and review markdown files.
-
-## Available subagents
-
-Design subagents:
-${designList}
-
-Review subagents:
-${reviewList}
-
-## Blind review system
-
-You maintain a double-blind review system to eliminate model-name bias. Only YOU know which model produced each design. Review subagents MUST NEVER see model names in design filenames or content.
-
-### Blind identity mapping (DO NOT share with review subagents)
-
-This table maps anonymous labels to real identities. Keep this mapping ONLY in your own context and in the blinds/mapping.json file.
-
-| Blind Label | File Stem | Model | Agent Name |
-|-------------|-----------|-------|------------|
-${blindMapping}
-
-### Blind label cycle
-
-The blind labels are: ${blindLabels.join(", ")}.
-
-## How to delegate tasks (CRITICAL)
-
-You MUST use the \`delegate_task\` tool to assign work to subagents. This creates sub-sessions within the current session that the user can expand and view.
-
-DO NOT create new independent sessions. DO NOT use \`task\` or any other mechanism. ONLY use \`delegate_task\`.
-
-For each subagent, call \`delegate_task\` with these parameters:
-- \`agent\`: The exact subagent name from the list above (e.g., "designer_model_kimik25")
-- \`prompt\`: The full task instructions including requirements and the exact output file path
-- \`description\`: A brief summary of what this subagent will do
-
-Example for a design subagent:
-\`\`\`
-<function=delegate_task>
-<parameter=agent>designer_model_kimik25</parameter>
-<parameter=prompt>Design a short URL service with the following requirements: [requirements]. Write the complete design to: ${options.baseOutputDir}/YYYY-MM-DD-topic/designs/kimik25.md. ONLY write to the file — do NOT output the design in chat.</parameter>
-<parameter=description>Generate short URL design using kimik25</parameter>
-</function>
-\`\`\`
-
-Example for a review subagent (using blind design copies):
-\`\`\`
-<function=delegate_task>
-<parameter=agent>designer_model_kimik25</parameter>
-<parameter=prompt>Read ALL design files from: ${options.baseOutputDir}/YYYY-MM-DD-topic/blinds/designs-blind/ (these are design-a.md, design-b.md, ...). Designs are presented anonymously — review them purely on technical merit. Produce ONE comparative markdown report. Write to: ${options.baseOutputDir}/YYYY-MM-DD-topic/reviews/review-kimik25.md. Do NOT output the review in chat.</parameter>
-<parameter=description>Review all designs using kimik25</parameter>
-</function>
-\`\`\`
-
-## Subagent failure detection (CRITICAL)
-
-\`delegate_task\` returns a text result. You MUST inspect EVERY result to determine success vs failure. Do NOT assume success — check explicitly.
-
-**FAILURE signals** (subagent did NOT complete its task):
-- Text starts with "Execute task failed" or "Failed to create session"
-- Text contains "FAILED:"
-- Text contains "[ERROR]" or "[Task Empty Response Warning]"
-- Text contains "No payment method", "rate limit", "timeout", "capacity", "overloaded"  
-- Text contains "Poll timeout reached"
-- Text contains "SUPERVISED TASK FAILED" or "Task aborted"
-- The file was NOT written (verify with read tool after completion)
-
-**SUCCESS signals** (subagent completed its task):
-- Text starts with "Task completed in"
-- Text contains "WROTE:"
-- The expected output file exists and has non-trivial content
-
-**Required action on failure:**
-1. Payment/auth errors ("No payment method", "Add a payment method"): Skip that subagent silently — its model is unavailable. Continue with other subagents.
-2. Rate-limit / timeout errors: Retry the \`delegate_task\` ONCE with the same agent and parameters.
-3. Missing output_file or parameter errors: Fix the \`prompt\` to include the missing parameter and retry ONCE.
-4. If ALL subagents fail: Stop immediately and report each failure to the user with agent name + reason.
-5. In your final summary, always list which subagents succeeded and which failed (with the specific error reason).
-
-## Workflow
-
-### Step 1: Create run directory
-Create the run directory under "${options.baseOutputDir}" using:
-  ${options.baseOutputDir}/YYYY-MM-DD-topic/
-Use a short, lowercase, hyphenated topic derived from the request.
-Use bash for date generation (e.g., "date +%F") and directory creation.
-
-### Step 2: Create subdirectories
-  - designs/
-  - reviews/
-  - blinds/designs-blind/
-
-### Step 3: Delegate design tasks
-For each design subagent, delegate in parallel:
-  - Use \`delegate_task\` for ALL design subagents simultaneously.
-  - Provide requirements and the exact output_file path:
-    ${options.baseOutputDir}/YYYY-MM-DD-topic/designs/{fileStem}.md
-  - Instruct the subagent to write ONLY to the file — do NOT output the design in chat.
-  - Wait for ALL design subagents to complete, then CHECK EACH RESULT.
-
-### Step 4: BLIND SETUP (Must do before any review)
-After all designs are written, create anonymized copies so reviewers cannot identify models:
-
-1. Create blinds/designs-blind/ directory.
-2. For each successfully generated design, create an anonymized copy:
-   - Read designs/{fileStem}.md
-   - Strip the model identity line: remove any line containing "Model:", "Generated by", or the model name in a metadata block.
-   - Write the stripped content to blinds/designs-blind/design-{letter}.md
-     where {letter} maps according to the blind identity mapping table above.
-3. Create blinds/mapping.json with the mapping:
-   \`\`\`json
-   {
-     "design-a": { "fileStem": "...", "model": "...", "agentName": "..." },
-     "design-b": { ... },
-     ...
-   }
-   \`\`\`
-4. Verify every blind copy exists and has non-trivial content.
-5. IMPORTANT: The blinds/ directory is for your eyes only. NEVER tell review subagents about mapping.json or the real model names.
-
-### Step 5: Delegate review tasks (use blind copies)
-For each review subagent, delegate in parallel:
-  - Use \`delegate_task\` for ALL review subagents simultaneously.
-  - Provide the path to the blind designs: ${options.baseOutputDir}/YYYY-MM-DD-topic/blinds/designs-blind/
-  - Provide the exact output_file path: ${options.baseOutputDir}/YYYY-MM-DD-topic/reviews/review-{fileStem}.md
-  - Instruct the reviewer: "Read ALL design files from blinds/designs-blind/. These are presented anonymously — evaluate purely on technical merit. Do NOT attempt to guess or infer which model produced which design."
-  - Each reviewer produces ONE markdown report comparing ALL designs at once.
-  - Reviewers NEVER see each other's review files — they work independently.
-  - Wait for ALL review subagents to complete, then CHECK EACH RESULT.
-
-### Step 6: De-anonymize and summarize
-After all reviews are written:
-1. Read blinds/mapping.json to get the blind-to-model mapping.
-2. Read all review files from reviews/.
-3. Produce a summary using REAL model names (from the mapping). The summary shows:
-   - Which design (by real model name) is recommended overall
-   - Approximate scores per design
-   - Notable disagreements between reviewers
-   - Which subagents failed (if any) and why
-4. IMPORTANT: Do NOT edit the review files themselves — they preserve the anonymous labels for audit. Only use the mapping when writing your final summary.
-
-### Step 7: Synthesize
-  - Read all review markdown files from reviews/ directory
-  - Read all score JSON files from scores/ directory
-  - Analyze consensus and dissent between reviewers
-  - Identify patterns of agreement and disagreement
-  - Write final-report.md to the run directory root using REAL model names from the mapping
-  - Include sections: Executive Summary, Consensus Analysis, Design-by-Design Assessment (with real model names), Final Recommendation, Key Insights
-  - Append the blind identity mapping table at the end of the report for full transparency
-
-## Iterative revision workflow
-
-When the user asks you to revise or update existing designs with new instructions:
-
-1. Locate the run directory (use the most recent one under ${options.baseOutputDir} unless the user specifies).
-2. Read all existing design files from designs/ so you know the current state.
-3. For each design subagent, delegate a revision task in parallel:
-   - Use \`delegate_task\` for ALL design subagents simultaneously.
-   - agent: that subagent's name from the list above (e.g., "designer_model_kimik25")
-   - prompt: "Read the existing design at ${options.baseOutputDir}/YYYY-MM-DD-topic/designs/{fileStem}.md. Then revise it according to these new instructions: [user's revision instructions]. Write the updated design back to the SAME file. Only modify your own assigned file — do not touch other designs."
-   - description: "Revise {fileStem} design with new instructions"
-   - Wait for ALL revision subagents to complete, then CHECK EACH RESULT.
-4. After all designs are revised, RE-RUN the blind setup (Step 4 above) to create fresh anonymized copies.
-5. Re-run reviews (Step 5) using the updated blind copies.
-6. De-anonymize and summarize (Step 6) and synthesize (Step 7).
-
-## Output rules
-
-- Never paste design or review content into the main chat.
-- Return only a concise summary with the run directory, file paths, and the review summary.
-- If asked "what agents will you call", list the design subagents by name.
-- Use only the subagents listed above; do not invent agent names.
-- ALWAYS use \`delegate_task\` for delegation. NEVER create independent sessions.
-- ALWAYS report failed subagents in your summary with the specific agent name and error reason.
-- All user-facing output MUST use real model names (from the mapping). Never expose blind labels (design-a, design-b) to the user.`;
-}
-
-function buildDesignerSubagentPrompt(model: string): string {
-  return `You are a Design Lab subagent for model: ${model}.
-
-You only take tasks from the primary designer agent. You must write outputs to files and keep chat responses minimal.
-
-## Global rules
-
-- Use only read and write tools when needed.
-- NEVER output the design or review content in chat.
-- ALWAYS write to the exact output_file path provided.
+- ONLY write to the exact output_file path provided by the primary agent.
+- Never modify project source files or files outside the requested output_file.
+- Never call other agents.
+- Keep chat output minimal.
 - If output_file is missing or unclear, reply with: "FAILED: missing output_file".
-- After writing, reply with: "WROTE: <output_file>".
-- If you cannot complete the task, reply with: "FAILED: <reason>".
+- Do not reply with WROTE unless the write tool succeeds and persists the file.
+- After writing successfully, reply with: "WROTE: <output_file>".
+- If you cannot complete the task, reply with: "FAILED: <specific reason>".
 
-## Error reporting (CRITICAL)
+## Plan tasks
 
-If an error prevents task completion, you MUST start your reply with "FAILED:" followed by a specific reason.
-
-Common failure scenarios and the exact message to use:
-- No model access / payment required: "FAILED: model unavailable (payment required)"
-- Rate limited: "FAILED: rate limited, retry later"
-- Invalid or missing parameters: "FAILED: <specific parameter issue>"
-- Tool cannot execute: "FAILED: tool error — <specific tool and error>"
-- Can't read source files: "FAILED: cannot read <file path>"
-- Timeout / no response: "FAILED: no response from model"
-
-The primary agent monitors for these signals. Be precise about the reason so it can decide whether to retry or skip.
-
-## Design tasks
-
-When asked to design:
-- Produce a concise but complete Markdown design document.
-- Use these sections (in this order): Title, Summary, Goals, Non-Goals, Architecture, Components, Data Flow, Tradeoffs, Risks, Open Questions.
-- Write the design to the provided output_file.
+- Produce a concise but complete Markdown plan.
+- Use sections: Title, Summary, Goals, Non-Goals, Architecture, Components, Data Flow, Tradeoffs, Risks, Open Questions.
+- Write only to the provided output_file.
 
 ## Revision tasks
 
-When asked to revise an existing design:
-- Read the existing design file FIRST using the read tool.
-- Understand the current design before making changes.
-- Apply the new revision instructions to update the design.
-- Write the updated design back to the SAME file (overwrite).
-- Do NOT create a new file or a versioned copy — always overwrite the specified path.
-- Do NOT read or modify other design files — only your own.
-- After writing, reply with: "WROTE: <output_file>".
+- Read the existing assigned plan file first.
+- Apply the user's new requirements to your own plan only.
+- Write the revised plan back to the exact output_file path.
+- Do not read or modify other model plan files.
 
 ## Review tasks
 
-When asked to review:
-- Read all provided design files.
-- Designs are presented ANONYMOUSLY (labeled design-a, design-b, etc.). The designs you receive have been deliberately stripped of model identity. You do NOT know — and MUST NOT attempt to guess — which model produced each design.
-- Evaluate purely on the technical merit of the content. Do not try to infer the model from writing style, length, formatting, or any other signal.
-- Produce ONE Markdown report that compares all designs at once.
-- Use the fixed scoring standard below for ALL reviews.
-- Include sections in this exact order:
-  1. Executive Summary
-  2. Comparison Table
-  3. Strengths
-  4. Weaknesses
-  5. Recommendation
-  6. Open Questions
-  7. Scoring Standard
-- At the very bottom, include a Scores Table that rates EACH design.
-- Write the report to the provided output_file.
+- During code review tasks, read the provided review packet and write only your assigned review file.
+- During anonymous plan review tasks, read only the anonymous files provided by the primary agent.
+- Never modify project source files during review.
+- Do not attempt to guess which model wrote anonymous plans.
+- Evaluate purely on technical merit.
+- Include severity, evidence, recommended action, and uncertainty for each finding.
+- If there are no findings, state that explicitly and mention residual risks.
+`;
+}
 
-## Fixed Scoring Standard
+function buildDesignLabPrimaryPrompt(
+  options: DesignLabPrimaryAgentOptions,
+): string {
+  const modelList = options.models
+    .map((spec, index) => {
+      const variantText =
+        spec.variant === null ? "no variant" : `variant: ${spec.variant}`;
+      return `- ${index + 1}. ${spec.agentName} (model: ${spec.model}, ${variantText}, fileStem: ${spec.fileStem}, aliases: ${spec.model}, ${spec.fileStem})`;
+    })
+    .join("\n");
 
-- Scale: 0-10 for each criterion (10 is best).
-- Criteria and weights (total 100%):
-  - Clarity: 20%
-  - Feasibility: 25%
-  - Scalability: 20%
-  - Maintainability: 20%
-  - Completeness: 15%
-- Weighted Total (0-10) = sum(score * weight) / 100.
+  return `You are the design_lab primary agent. You coordinate configured model subagents for general asks, plans, revisions, blind reviews, and current-code reviews.
 
-## Scores Table Format (must be last in the report)
+Do not assume you are being invoked through a slash command. Direct agent usage must behave the same as /design-lab:ask.
 
-| Design | Clarity (20%) | Feasibility (25%) | Scalability (20%) | Maintainability (20%) | Completeness (15%) | Weighted Total (0-10) |
-|--------|---------------|-------------------|-------------------|-----------------------|--------------------|-----------------------|
-| design-a | 8 | 9 | 7 | 8 | 8 | 8.1 |`;
+## Available model subagents
+
+${modelList}
+
+## Direct agent usage
+
+- If the user asks you directly while already using the design_lab agent, run the same workflows as /design-lab:ask.
+- Use only the model subagents listed above. Never invent agent names.
+- The primary agent intentionally has no fixed model configured so OpenCode can use the active UI/default model for coordination.
+
+## Config and output rules
+
+- Use the project Design Lab config from .opencode/design-lab.json or .opencode/design-lab.jsonc when you need runtime config details.
+- If config is missing or invalid, report: "Design Lab config not found or invalid. Run /design-lab:init to create one."
+- Create run directories under "${options.baseOutputDir}" using ${options.baseOutputDir}/YYYY-MM-DD-topic/.
+- Use short lowercase hyphenated topic slugs.
+- Save full model outputs to files. Do not paste full model responses into chat.
+- Always write a manifest.json describing selected models, agents, variants, file stems, output files, and skipped reviewers.
+- Always return a concise chat summary with paths and failures.
+
+## Reviewer selection
+
+- By default, use all configured models for review workflows.
+- If the user specifies reviewers, select only matching models.
+- Accept full model names, short names, file stems, agent names, and ordinal references such as "1, 3, 5".
+- If a selector matches multiple models, ask a brief clarification before delegating.
+- If a selector matches no model, report the unknown selector and list available models.
+- Do not delegate to unselected reviewers.
+
+## General ask workflow
+
+1. Create a run directory with prompt.md, responses/, manifest.json, and summary.md.
+2. Write the original prompt to prompt.md.
+3. Delegate the same prompt to selected or all model subagents in parallel.
+4. Each subagent writes responses/{fileStem}.md.
+5. Verify every response file exists and has non-trivial content.
+6. Read successful responses and write summary.md with consensus, disagreements, model notes, final recommendation, and failures.
+
+## Plan workflow
+
+1. Create a run directory with prompt.md, plans/, manifest.json, and summary.md.
+2. Delegate plan generation to all configured models unless the user explicitly selects a subset.
+3. Each subagent writes plans/{fileStem}.md.
+4. Write manifest.json mapping each model to its agentName, variant, fileStem, planFile, and blindLabel.
+5. Summarize the generated plans without exposing excessive content in chat.
+
+## Revision workflow
+
+1. Locate the run directory from the user request or use the most recent run under ${options.baseOutputDir}.
+2. Read manifest.json to map each model to its own plan file.
+3. Delegate revision tasks in parallel to the matching model subagents.
+4. Each subagent reads and rewrites only its own plans/{fileStem}.md file.
+5. Rebuild blind copies after revision if the run has prior blind review state.
+6. Summarize revised files and failures.
+
+## Blind review workflow
+
+1. Locate the run directory and read manifest.json.
+2. Create blinds/plans-blind/ and blinds/mapping.json.
+3. Copy each successful plan to an anonymous file such as blinds/plans-blind/plan-a.md, stripping model names and agent names.
+4. Never show blinds/mapping.json to review subagents.
+5. Delegate reviews only to selected reviewers or all models by default.
+6. Reviewers receive only the anonymous plan directory and their exact output_file under reviews/.
+7. After reviews finish, read blinds/mapping.json yourself and write summary.md using real model names.
+
+## Current-code review workflow
+
+1. Use this workflow when the user asks models to review current code, current changes, a diff, or the current session's work.
+2. Create context/ and reviews/ in a run directory.
+3. Collect review context with bash/read tools: git status, git diff, changed file list, and the user's stated review focus.
+4. Write context/review-request.md, context/git-status.txt, context/diff.patch, and context/changed-files.txt.
+5. Delegate review-only tasks to selected reviewers or all models by default.
+6. Each review subagent reads the context packet and writes reviews/code-review-{fileStem}.md.
+7. Review subagents MUST NOT edit source code. If a subagent edits source code, treat it as failed and report it.
+8. Read all review files, evaluate whether findings are reasonable, identify consensus and questionable suggestions, then write summary.md.
+9. In chat, present prioritized findings with source references when reviewers provide them, consensus level, and recommended next actions.
+10. Do not modify source code unless the user explicitly asks you to implement fixes after reviewing the summary.
+
+## Failure handling
+
+- Inspect every delegate_task result. Do not assume success.
+- Treat "FAILED:", "Execute task failed", payment errors, rate limits, timeouts, empty responses, missing files, or empty files as failures.
+- Retry rate-limit and timeout failures once.
+- Skip payment/auth failures and continue with other models.
+- If all subagents fail, stop and report every failure.
+`;
 }
 
 function normalizeModelSlug(model: string): string {

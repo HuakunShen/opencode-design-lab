@@ -1,296 +1,157 @@
-# Design Lab - Technical Design Document
-
-## Table of Contents
-
-1. [System Overview](#system-overview)
-2. [Core Principles](#core-principles)
-3. [Architecture](#architecture)
-4. [Component Details](#component-details)
-5. [Data Flow](#data-flow)
-6. [Agent System Prompts](#agent-system-prompts)
-7. [Session Management](#session-management)
-8. [Error Handling](#error-handling)
-9. [Configuration](#configuration)
-10. [Future Improvements](#future-improvements)
+# Design Lab Technical Design
 
 ## System Overview
 
-OpenCode Design Lab is an agent-orchestrated design workflow. It registers a
-primary agent that delegates design and review tasks to model-specific
-subagents. Each subagent writes its output directly to Markdown files so the
-primary agent does not need to ingest large artifacts into the chat context.
-
-### Key Capabilities
-
-- **Dynamic model registration**: Subagents are created from config at startup
-- **Correct model usage**: Each subagent is bound to its configured model
-- **Per-model effort control**: Each model supports `variant` (low/medium/high/max)
-- **File-first outputs**: Designs and reviews are written to disk, not chat
-- **Parallel orchestration**: Subagents run simultaneously for performance (~N× speedup with N models)
-- **Cross-review**: The same model set reviews all designs in a single report
-- **Hot-reloadable config**: Changes to `.opencode/design-lab.json` take effect on next command
+OpenCode Design Lab registers one primary agent, `design_lab`, and one
+model-specific subagent per configured model. The primary agent coordinates
+multi-model planning, plan revision, anonymous plan review, general asks, and
+current-code review. Subagents are file-first workers: they write only the
+assigned artifact file and do not modify project source files during review.
 
 ## Core Principles
 
-### 1. Dynamic Model Mapping
+### Single Coordinator
 
-Agent definitions are derived from `design_models` and `review_models` in the
-config. This prevents mismatches between prompts and models.
+`design_lab` is the only command workflow primary agent. It does not set a
+`model` field, allowing OpenCode to use the active UI/default model for
+coordination. This avoids surprising model switches after invoking
+`/design-lab:ask`.
 
-### 2. File-First Output
+### Model-Specific Workers
 
-Designs and reviews are written directly to Markdown files. The primary agent
-only returns file paths and summaries, minimizing context usage.
+Each configured model becomes a `design_lab_model_*` subagent. Subagents are
+bound to their configured model and optional variant. They never call other
+agents.
 
-### 3. Design Isolation
+### File-First Output
 
-Each design subagent works independently. It never sees other designs unless
-explicitly asked to review them.
+Full model outputs are written to `.design-lab/` instead of being pasted into
+chat. The primary agent reads those files and returns concise synthesis.
 
-### 4. Parallel Delegation
+### Review-Only Safety
 
-Subagents run in parallel using Promise.allSettled for maximum performance.
-Each subagent is independent and writes to its own file, eliminating conflicts.
+For current-code review, subagents only read the review packet and write review
+Markdown files. They must not edit source files. The primary agent may later edit
+code only if the user explicitly asks it to apply fixes.
 
 ## Architecture
 
-### High-Level Flow
-
-```
-User Request
-  ↓
-Primary Agent (designer)
-  ↓
-Create Run Directory
-  ↓
-Design Delegation (N subagents, sequential)
-  ↓
-Design Files Written (designs/*.md)
-  ↓
-Review Delegation (M subagents, sequential)
-  ↓
-Review Files Written (reviews/*.md)
-  ↓
-Summary Returned (paths only)
+```text
+User prompt or /design-lab:ask
+  -> design_lab primary agent
+  -> select workflow and reviewer/model subset
+  -> create run directory and manifest
+  -> delegate to design_lab_model_* subagents
+  -> verify output files
+  -> synthesize summary.md and chat response
 ```
 
-### Visual Workflow
+## Agent Registration
 
-```mermaid
-flowchart TB
-    Start([User: Make Designs]) --> Primary[Primary Agent: designer]
-    Primary --> CreateDir[Create Run Directory
-.base_output_dir/YYYY-MM-DD-topic/]
-    CreateDir --> D1[Subagent 1
-model: from config]
-    CreateDir --> D2[Subagent 2
-model: from config]
+`src/design-lab.ts` loads `DesignLabConfig`, normalizes `models`, and registers:
 
-    D1 --> Save1[Write design
-file to designs/]
-    D2 --> Save2[Write design
-file to designs/]
+- `design_lab`: primary coordinator with `delegate_task`, `read`, `write`, and `bash`.
+- `design_lab_model_*`: subagents with `read` and `write` only.
 
-    Save1 --> Review[Primary Agent: Review Phase]
-    Save2 --> Review
-
-    Review --> R1[Reviewer 1
-same model set]
-    Review --> R2[Reviewer 2
-same model set]
-
-    R1 --> SaveR1[Write review
-file to reviews/]
-    R2 --> SaveR2[Write review
-file to reviews/]
-
-    SaveR1 --> Done([Return summary
-with file paths])
-    SaveR2 --> Done
-
-    style Start fill:#e1f5ff
-    style Review fill:#e1f5ff
-    style Done fill:#c8e6c9
-```
-
-### Directory Structure
-
-```
-.design-lab/
-└── YYYY-MM-DD-topic/
-    ├── designs/
-    │   ├── glm-4-6.md
-    │   └── glm-4-7.md
-    └── reviews/
-        ├── review-glm-4-6.md
-        └── review-glm-4-7.md
-```
-
-File stems are derived from the model short name by lowercasing and replacing
-separators with hyphens (e.g., `zhipuai-coding-plan/glm-4.6` → `glm-4-6`).
-
-## Component Details
-
-### 1. Plugin Entry (`src/design-lab.ts`)
-
-**Responsibilities**:
-
-- Load `DesignLabConfig` from disk
-- Normalize model configs (strings → `{ model, variant: "max" }`)
-- Register the primary agent `designer`
-- Register a `designer_model_*` subagent for each configured model
-- Provide consistent file naming and agent naming
-
-### 2. Agent Factory (`src/agents/index.ts`)
-
-**Responsibilities**:
-
-- Create prompts for the primary agent and subagents
-- Normalize model names into agent keys and file stems
-- Define safe tool permissions for each agent
-
-### 3. Configuration Loader (`src/config/loader.ts`)
-
-**Responsibilities**:
-
-- Load user config from `~/.config/opencode/design-lab.json(c)`
-- Load project config from `.opencode/design-lab.json(c)`
-- Merge configs (project overrides user)
-- Validate via Zod schema
-
-## Data Flow
-
-### Design Flow
-
-```
-Requirements (User)
-  ↓
-Primary Agent
-  ↓
-Generate topic + run directory
-  ↓
-Delegate to each design subagent
-  ↓
-Each subagent writes designs/{model}.md
-  ↓
-Primary agent returns summary only
-```
-
-### Review Flow
-
-```
-Design files on disk
-  ↓
-Primary Agent
-  ↓
-Delegate to each review subagent
-  ↓
-Each reviewer reads all designs
-  ↓
-Each reviewer writes reviews/review-{model}.md
-  ↓
-Primary agent reads all reviews and summarizes scores and recommendation
-```
-
-## Agent System Prompts
-
-### Primary Agent Prompt (designer)
-
-The primary agent prompt encodes the orchestration contract:
-
-- Create a run directory under `base_output_dir`
-- Delegate design tasks to all `designer_model_*` subagents
-- Delegate review tasks to the review model list
-- Read all review files and summarize scores and recommendation
-
-### Subagent Prompt (designer*model*\*)
-
-Each subagent prompt ensures file-first output:
-
-- Write design or review Markdown to the specified path
-- Do not emit the content into chat
-- Respond with a minimal confirmation string
-- Use the fixed scoring standard and include a scores table at the bottom of reviews
-
-## Session Management
-
-The plugin does not create sessions directly. The primary agent delegates tasks
-via `delegate_task`, and OpenCode handles session lifecycles. The workflow is
-intentionally sequential to reduce contention and make results reproducible.
-
-## Error Handling
-
-- Subagents report failures with `FAILED: <reason>` (6 standardized error codes)
-- Primary agent inspects every `delegate_task` result for failure signals
-- Payment/auth errors: subagent skipped, other subagents continue
-- Rate-limit/timeout errors: retried once before giving up
-- All-subagent failure: stops and reports to user with per-agent error details
-- Directory creation errors are reported immediately
+The plugin no longer registers `designer`, `multi_model`, `designer_model_*`, or
+`multi_model_*`.
 
 ## Configuration
 
-### Schema
+```ts
+type ModelConfig =
+  | string
+  | {
+      model: string;
+      variant?: string | null;
+    };
 
-```typescript
-type ModelConfig = string | {
-  model: string;
-  variant?: "low" | "medium" | "high" | "max";  // default: "max"
+type DesignLabConfig = {
+  $schema?: string;
+  models: ModelConfig[];
+  default_variant: string | null;
+  base_output_dir: string;
+  design_agent_temperature: number;
+  review_agent_temperature: number;
+  topic_generator_model?: string;
 };
-
-{
-  $schema?: string;                    // URL to JSON schema for IDE validation
-  design_models: ModelConfig[];        // Min 2, models for design generation
-  review_models?: ModelConfig[];       // Defaults to design_models
-  base_output_dir: string;             // Default: ".design-lab"
-  design_agent_temperature: number;    // Default: 0.7
-  review_agent_temperature: number;    // Default: 0.1
-  topic_generator_model?: string;      // Reserved for future use
-}
 ```
 
-### Variant (Reasoning Effort)
+Plain string model entries inherit `default_variant`. Object entries can set any
+non-empty string variant such as `xhigh`, or `null` to omit variants for that
+model. The plugin passes variants through and does not attempt provider
+capability detection.
 
-Each model supports a `variant` field to control reasoning effort:
+## Workflows
 
-| Variant | Behavior |
-|---------|----------|
-| `max` | Highest effort (default for design). Each model maps this to its maximum. Opus supports true max; Sonnet caps at high. |
-| `high` | High effort. Good for review tasks where speed matters more than exhaustive reasoning. |
-| `medium` | Balanced. |
-| `low` | Minimal reasoning. Fastest, lowest cost. |
+### General Ask
 
-Models are configured either as plain strings (default variant = `max`) or as objects:
+The primary writes `prompt.md`, delegates the prompt to selected or all model
+subagents, stores outputs under `responses/`, and writes `summary.md`.
 
-```json
-{
-  "design_models": [
-    "opencode/kimi-k2.6",
-    { "model": "opencode/kimi-k2.5", "variant": "high" }
-  ],
-  "review_models": [
-    { "model": "opencode/kimi-k2.6", "variant": "high" }
-  ]
-}
+### Plan Generation
+
+The primary writes `prompt.md`, delegates plan generation, stores plans under
+`plans/{fileStem}.md`, and writes `manifest.json` mapping models, variants,
+agents, file stems, plan files, and blind labels.
+
+### Plan Revision
+
+The primary locates the run directory, reads `manifest.json`, and delegates each
+model to revise only its own plan file. If blind copies already exist, they are
+rebuilt from the revised plans.
+
+### Blind Plan Review
+
+The primary copies plans into `blinds/plans-blind/plan-a.md`, `plan-b.md`, and so
+on. It writes `blinds/mapping.json` for its own use and never shares that mapping
+with reviewers. Review subagents receive only anonymous files and write reports
+under `reviews/`. The primary de-anonymizes only in `summary.md`.
+
+### Current-Code Review
+
+The primary creates a review packet under `context/` containing the user request,
+`git status`, `git diff`, and changed files. Selected review subagents read the
+packet and write `reviews/code-review-{fileStem}.md`. The primary reads all
+reviews, identifies consensus and questionable suggestions, and writes
+`summary.md`.
+
+## Reviewer Selection
+
+By default, review workflows use all configured models. The user can specify a
+subset by full model name, short name, file stem, agent name, or ordinal. The
+primary must ask for clarification when a selector is ambiguous and must report
+unknown selectors with the available model list.
+
+## Output Layout
+
+```text
+.design-lab/YYYY-MM-DD-topic/
+├── prompt.md
+├── manifest.json
+├── plans/
+├── responses/
+├── blinds/
+│   ├── mapping.json
+│   └── plans-blind/
+├── reviews/
+├── context/
+└── summary.md
 ```
 
-JSON Schema available at: `https://raw.githubusercontent.com/HuakunShen/opencode-design-lab/main/schemas/design-lab-config.schema.json`
+Not every workflow uses every directory. Plan workflows use `plans/`; general
+asks use `responses/`; current-code reviews use `context/` and `reviews/`.
 
-## Future Improvements
+## Error Handling
 
-### Reliability
+- Subagents report success as `WROTE: <output_file>`.
+- Subagents report failure as `FAILED: <specific reason>`.
+- The primary verifies every expected file exists and has non-trivial content.
+- Rate limits and timeouts are retried once.
+- Payment/auth failures are skipped while other models continue.
+- If all subagents fail, the primary stops and reports every failure.
 
-- Persist requirements to `task.md` in each run directory
-- Add retries for subagent failures with exponential backoff
-- Model-level fallback chains for unavailable models
+## Compatibility Notes
 
-### Features
-
-- Optional JSON schema outputs alongside Markdown
-- Aggregated score summaries from reviewer reports
-- Parallel execution with rate limiting
-- Iterative design revision (each subagent revises only its own file, then re-reviews)
-
-### User Experience
-
-- Progress indicators for each subagent step
-- Optional run naming overrides and custom output directories
+Legacy direct tools still use the low-level JSON design/review helper agents, but
+slash-command workflows are centered on `design_lab` and `/design-lab:ask`.

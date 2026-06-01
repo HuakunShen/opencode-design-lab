@@ -1,15 +1,10 @@
 {
   "$schema": "https://raw.githubusercontent.com/HuakunShen/opencode-design-lab/main/schemas/design-lab-config.schema.json",
-  "design_models": [
-    "kimi-for-coding/k2p6",
+  "models": [
     "deepseek/deepseek-v4-flash",
-    "deepseek/deepseek-v4-pro"
+    "openai/gpt-5.4-mini"
   ],
-  "review_models": [
-    "kimi-for-coding/k2p6",
-    "deepseek/deepseek-v4-flash",
-    "deepseek/deepseek-v4-pro"
-  ],
+  "default_variant": "max",
   "base_output_dir": ".design-lab",
   "design_agent_temperature": 0.7,
   "review_agent_temperature": 0.1

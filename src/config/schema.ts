@@ -2,16 +2,18 @@ import { z } from "zod";
 
 /**
  * Per-model configuration.
- * Accepts a plain model string (default variant = "max") or an object with model + variant.
+ * Accepts a plain model string or an object with model + variant.
+ * Use variant null when a model should be invoked without a variant.
  */
+const VariantSchema = z.union([z.string().min(1), z.null()]);
+
 const ModelConfigSchema = z.union([
   z.string().describe("Model identifier (e.g. 'opencode/kimi-k2.6')"),
   z.object({
     model: z.string().describe("Model identifier (e.g. 'opencode/kimi-k2.6')"),
-    variant: z
-      .enum(["low", "medium", "high", "max"])
-      .default("max")
-      .describe("Reasoning effort variant"),
+    variant: VariantSchema.optional().describe(
+      "Optional model variant. Use null to omit variant for this model.",
+    ),
   }),
 ]);
 
@@ -23,22 +25,20 @@ export type ModelConfig = z.infer<typeof ModelConfigSchema>;
 export const DesignLabConfigSchema = z.object({
   $schema: z.string().optional(),
   /**
-   * List of models to use for design generation.
+   * List of models to use for all Design Lab workflows.
    * Each entry can be a plain model string ("opencode/kimi-k2.6") or an object
-   * with model + variant ({"model": "opencode/kimi-k2.6", "variant": "max"}).
-   * Default variant for plain strings is "max".
+   * with model + variant ({"model": "opencode/kimi-k2.6", "variant": "xhigh"}).
+   * Plain strings use default_variant during agent registration.
    * Minimum 2 models required.
    */
-  design_models: z
-    .array(ModelConfigSchema)
-    .min(2, "At least 2 design models required"),
+  models: z.array(ModelConfigSchema).min(2, "At least 2 models required"),
 
   /**
-   * List of models to use for design review and scoring.
-   * If not specified, defaults to using all design_models.
-   * Each entry follows the same format as design_models.
+   * Default variant for plain model strings and object entries that omit variant.
+   * Use null to invoke models without a variant by default.
+   * @default "max"
    */
-  review_models: z.array(ModelConfigSchema).optional(),
+  default_variant: VariantSchema.default("max"),
 
   /**
    * Base output directory for design labs

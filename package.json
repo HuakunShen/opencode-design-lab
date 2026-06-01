@@ -13,7 +13,11 @@
   "bugs": {
     "url": "https://github.com/HuakunShen/opencode-design-lab/issues"
   },
-  "main": ".opencode/plugins/design-lab.js",
+  "main": "./.opencode/plugins/design-lab.js",
+  "exports": {
+    ".": "./.opencode/plugins/design-lab.js",
+    "./server": "./.opencode/plugins/design-lab.js"
+  },
   "files": [
     ".opencode/plugins"
   ],
@@ -37,6 +41,7 @@
   "dependencies": {
     "@opencode-ai/plugin": "^1.14.31",
     "@opencode-ai/sdk": "^1.14.31",
+    "pino": "^10.3.1",
     "zod": "^4.4.2"
   }
 }

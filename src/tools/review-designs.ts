@@ -30,7 +30,7 @@ export function createReviewDesignsTool(
   ctx: PluginInput,
   config: DesignLabConfig,
 ): ToolDefinition {
-  const reviewModels = config.review_models ?? config.design_models;
+  const reviewModels = config.models;
 
   return tool({
     description: `Review and score design proposals using ${reviewModels.length} reviewer models.
@@ -86,7 +86,8 @@ Use this after generate_designs to evaluate and compare the generated designs.`,
 
       // Run reviews in parallel
       const reviewPromises = reviewModels.map(async (modelConfig) => {
-        const model = typeof modelConfig === "string" ? modelConfig : modelConfig.model;
+        const model =
+          typeof modelConfig === "string" ? modelConfig : modelConfig.model;
         try {
           const { review, scores } = await generateReview(
             ctx,

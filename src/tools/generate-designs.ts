@@ -37,8 +37,8 @@ export function createGenerateDesignsTool(
   return tool({
     description: `Generate multiple independent design proposals for a technical system.
 
-This tool creates design proposals using ${config.design_models.length} different AI models:
-${config.design_models.map((m) => `- ${m}`).join("\n")}
+This tool creates design proposals using ${config.models.length} different AI models:
+${config.models.map(formatModelConfigForDescription).join("\n")}
 
 Each model generates a design completely independently, without seeing other models' outputs.
 
@@ -92,8 +92,8 @@ Use this when you want to explore multiple approaches to a design problem and co
         requirements,
         topic,
         created: new Date().toISOString(),
-        design_models: config.design_models,
-        review_models: config.review_models ?? config.design_models,
+        models: config.models,
+        default_variant: config.default_variant,
       };
       fs.writeFileSync(
         path.join(labDir, "task.json"),
@@ -101,8 +101,9 @@ Use this when you want to explore multiple approaches to a design problem and co
       );
 
       // Generate designs from each model in parallel
-      const designPromises = config.design_models.map(async (modelConfig) => {
-        const model = typeof modelConfig === "string" ? modelConfig : modelConfig.model;
+      const designPromises = config.models.map(async (modelConfig) => {
+        const model =
+          typeof modelConfig === "string" ? modelConfig : modelConfig.model;
         try {
           logger.info(
             { model },
@@ -202,6 +203,17 @@ ${
 }`;
     },
   });
+}
+
+function formatModelConfigForDescription(
+  modelConfig: DesignLabConfig["models"][number],
+): string {
+  if (typeof modelConfig === "string") {
+    return `- ${modelConfig}`;
+  }
+  const variant =
+    modelConfig.variant === undefined ? "default" : modelConfig.variant;
+  return `- ${modelConfig.model} (variant: ${variant})`;
 }
 
 /**

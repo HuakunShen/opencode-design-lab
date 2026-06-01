@@ -1,176 +1,159 @@
 # OpenCode Design Lab
 
-An OpenCode plugin that registers a primary design agent and model-specific
-subagents to generate and review designs directly to Markdown files.
+OpenCode Design Lab is an OpenCode plugin for running the same planning or
+review task across multiple configured models in one session. A single primary
+agent coordinates model-specific subagents, writes artifacts to disk, and
+summarizes results back into chat.
 
 ## Overview
 
-Design Lab uses a file-first, multi-model workflow:
-
-- **Dynamic model mapping**: Subagents are created from your config
-- **Correct model usage**: Each subagent is bound to its configured model
-- **Per-model variant**: Control reasoning effort per model (`low`/`medium`/`high`/`max`)
-- **File-first outputs**: Designs and reviews are written to disk, not chat
-- **Cross-review**: The same model set reviews all designs in a single report
+- **Single primary agent**: `design_lab` coordinates every workflow.
+- **Model-specific subagents**: `design_lab_model_*` agents are generated from config.
+- **Current model inheritance**: `design_lab` does not set a fixed model, so OpenCode can use the active UI/default model for coordination.
+- **Arbitrary variants**: model variants are passed through as configured, including values like `xhigh`.
+- **Review-only subagents**: model subagents write review files and never modify source code during review.
+- **File-first outputs**: full model responses, plans, reviews, manifests, and summaries are saved under `.design-lab/`.
 
 ## Commands
 
-| Command | Description |
-| --- | --- |
-| `/design-lab:init` | Initialize config file in `.opencode/design-lab.json` |
-| `/design-lab:journal` | Document recent changes, decisions, and tradeoffs in `.journal/` |
-| `/design-lab:design <topic>` | Generate design proposals from all configured models |
-| `/design-lab:review [dir]` | Run cross-reviews on existing designs |
-| `/design-lab:synthesize [dir]` | Synthesize reviews into a final qualitative report |
-| `/design-lab:repowiki` | Generate comprehensive repo wiki documentation |
+| Command                    | Description                                     |
+| -------------------------- | ----------------------------------------------- |
+| `/design-lab:init`         | Initialize `.opencode/design-lab.json`          |
+| `/design-lab:ask <prompt>` | Run the unified multi-model Design Lab workflow |
+| `/design-lab:journal`      | Document recent decisions in `.journal/`        |
+| `/design-lab:repowiki`     | Generate comprehensive repository documentation |
 
-## Installation
-
-### From npm (Future)
-
-```bash
-npm install opencode-design-lab
-```
-
-### From Source
-
-```bash
-git clone https://github.com/HuakunShen/opencode-design-lab.git
-cd opencode-design-lab
-bun install
-bun run build
-```
-
-Then add to your OpenCode config (`~/.config/opencode/opencode.json`):
-
-```json
-{
-  "plugin": ["opencode-design-lab"]
-}
-```
+You can also switch to the `design_lab` agent and ask directly without using
+`/design-lab:ask`. Direct agent usage follows the same workflow rules.
 
 ## Configuration
 
-Create a config file at `~/.config/opencode/design-lab.json` or
-`.opencode/design-lab.json`:
+Create `.opencode/design-lab.json`:
 
 ```json
 {
   "$schema": "https://raw.githubusercontent.com/HuakunShen/opencode-design-lab/main/schemas/design-lab-config.schema.json",
-  "design_models": [
-    "claude-sonnet-4",
-    "gpt-4o",
-    "gemini-3-pro"
+  "models": [
+    { "model": "openai/gpt-5.2-codex", "variant": "xhigh" },
+    { "model": "opencode/kimi-k2.5-free", "variant": "max" },
+    { "model": "local/model-without-variant", "variant": null }
   ],
-  "review_models": [
-    "claude-opus-4",
-    "gpt-5-2"
-  ],
+  "default_variant": "max",
   "base_output_dir": ".design-lab"
 }
 ```
 
-Each model can also be configured as an object with a `variant` to control reasoning effort:
+### Options
+
+| Option            | Type                   | Default       | Description                                      |
+| ----------------- | ---------------------- | ------------- | ------------------------------------------------ |
+| `models`          | `(string \| object)[]` | Required      | Models used for all Design Lab workflows, min 2  |
+| `default_variant` | `string \| null`       | `"max"`       | Variant applied to plain string model entries    |
+| `base_output_dir` | `string`               | `.design-lab` | Output directory for run artifacts               |
+
+Model entries can be plain strings or objects:
 
 ```json
 {
-  "design_models": [
-    { "model": "opencode/kimi-k2.6", "variant": "max" },
-    { "model": "opencode/kimi-k2.5", "variant": "high" }
+  "models": [
+    "openai/gpt-5.2-codex",
+    { "model": "openai/gpt-5.2-codex", "variant": "xhigh" },
+    { "model": "local/model-without-variant", "variant": null }
   ]
 }
 ```
 
-### Configuration Options
+- Plain strings use `default_variant`.
+- `variant` can be any non-empty string supported by your provider/OpenCode setup.
+- `variant: null` means invoke that model without a variant.
 
-| Option                     | Type                       | Default            | Description                                                               |
-| -------------------------- | -------------------------- | ------------------ | ------------------------------------------------------------------------- |
-| `design_models`            | `(string \| object)[]`     | **Required**       | Models for design generation (min 2). Strings default variant to `max`    |
-| `review_models`            | `(string \| object)[]`     | `design_models`    | Models for reviews. Defaults to design models if not specified            |
-| `base_output_dir`          | `string`                   | `.design-lab`      | Base directory for design lab outputs                                     |
-| `design_agent_temperature` | `number`                   | `0.7`              | Reserved for future use                                                   |
-| `review_agent_temperature` | `number`                   | `0.1`              | Reserved for future use                                                   |
-| `topic_generator_model`    | `string`                   | First design model | Reserved for future use                                                   |
+## Workflows
 
-### Model Variant
+### Generate Plans
 
-Each model entry supports an optional `variant` field:
-
-| Variant | Description |
-|---------|-------------|
-| `max`   | Highest reasoning effort (default for plain strings). Models cap at their maximum. |
-| `high`  | High effort. Good for reviews. |
-| `medium` | Balanced. |
-| `low`   | Fastest, lowest cost. |
-
-## Usage
-
-### Slash Commands
-
-All commands are registered as `/design-lab:<command>`:
-
-- `/design-lab:init` — Creates `.opencode/design-lab.json` from template
-- `/design-lab:journal` — Documents recent changes in a `.journal/` entry
-- `/design-lab:design <topic>` — Delegates designs to all model subagents
-- `/design-lab:review [dir]` — Cross-reviews existing designs
-- `/design-lab:synthesize [dir]` — Produces final qualitative synthesis report
-- `/design-lab:repowiki` — Generates comprehensive repo wiki docs
-
-### Agent Workflow
-
-You can also work interactively with the `designer` agent:
-
-**Generate designs:**
-
-```
-Ask all designer_model subagents to design a deepwiki clone. Output each design
-as a Markdown file with the model name as the filename.
+```text
+/design-lab:ask generate plans for adding OAuth login
 ```
 
-The primary agent will:
-- Create a run directory under `.design-lab/YYYY-MM-DD-topic/`
-- Delegate design generation to each `designer_model_*` subagent
-- Save designs to `designs/*.md`
+Each selected model writes its own plan under `plans/`, and `manifest.json`
+records the model-to-file mapping.
 
-**Cross-review:**
+### Revise Plans
 
-```
-Now ask the same set of models to review all designs. Each reviewer outputs one
-Markdown report comparing all designs at once.
+```text
+/design-lab:ask revise the latest plans to support multi-tenant auth
 ```
 
-Review files are saved to `reviews/review-*.md`.
+The primary agent reads `manifest.json` and asks each model to revise only its
+own plan file.
+
+### Blind Review Plans
+
+```text
+/design-lab:ask anonymously review the latest plans
+```
+
+The primary agent copies plan files to anonymous names under
+`blinds/plans-blind/`, writes `blinds/mapping.json`, and sends only anonymous
+files to reviewers.
+
+### Review Current Code Changes
+
+```text
+/design-lab:ask review current changes with gpt and kimi only
+```
+
+The primary agent collects `git status`, `git diff`, changed files, and your
+review focus into a context packet. Selected model subagents read the packet and
+write review files under `reviews/`. They do not edit source code.
+
+Reviewer selection can use full model names, short names, file stems, agent
+names, or ordinals such as `1, 3, 5`. Ambiguous selectors require clarification.
 
 ## Output Structure
 
-Each run creates a timestamped directory:
+Plan and blind review runs use:
 
-```
+```text
 .design-lab/YYYY-MM-DD-topic/
-├── designs/
-│   ├── claude-sonnet-4.md
-│   ├── gpt-4o.md
-│   └── gemini-3-pro.md
-└── reviews/
-    ├── review-claude-opus-4.md
-    └── review-gpt-5-2.md
+├── prompt.md
+├── manifest.json
+├── plans/
+│   ├── gpt-5-2-codex.md
+│   └── kimi-k2-5-free.md
+├── blinds/
+│   ├── mapping.json
+│   └── plans-blind/
+│       ├── plan-a.md
+│       └── plan-b.md
+├── reviews/
+│   ├── review-gpt-5-2-codex.md
+│   └── review-kimi-k2-5-free.md
+└── summary.md
+```
+
+Current-code review runs use:
+
+```text
+.design-lab/YYYY-MM-DD-code-review/
+├── context/
+│   ├── review-request.md
+│   ├── git-status.txt
+│   ├── diff.patch
+│   └── changed-files.txt
+├── reviews/
+│   ├── code-review-gpt-5-2-codex.md
+│   └── code-review-kimi-k2-5-free.md
+├── manifest.json
+└── summary.md
 ```
 
 ## Development
 
 ```bash
-# Build the plugin (outputs to .opencode/plugins/design-lab.js)
 bun run build
-
-# Development with watch mode
 bun run dev
-
-# Run tests (vitest)
 bun run test
-
-# Format code with prettier
-bun run format
-
-# Type checking
 bun run typecheck
+bun run export-schemas
 ```

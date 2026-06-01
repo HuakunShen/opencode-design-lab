@@ -77,7 +77,7 @@ describe("loadPluginConfig", () => {
     mockedExistsSync.mockImplementation((p) => p === projJson);
     mockedReadFileSync.mockImplementation((p) => {
       if (p === projJson) {
-        return JSON.stringify({ design_models: ["model-a", "model-b"] });
+        return JSON.stringify({ models: ["model-a", "model-b"] });
       }
       return "";
     });
@@ -85,7 +85,8 @@ describe("loadPluginConfig", () => {
     const result = loadPluginConfig("/tmp/test-proj");
 
     expect(result).not.toBeNull();
-    expect(result!.design_models).toEqual(["model-a", "model-b"]);
+    expect(result!.models).toEqual(["model-a", "model-b"]);
+    expect(result!.default_variant).toBe("max");
     expect(result!.base_output_dir).toBe(".design-lab");
   });
 
@@ -101,9 +102,9 @@ describe("loadPluginConfig", () => {
       if (p === userJson) {
         return JSON.stringify({ topic_generator_model: "gpt-4" });
       }
-      // project provides design_models (no default in schema)
+      // project provides models (no default in schema)
       if (p === projJson) {
-        return JSON.stringify({ design_models: ["a", "b"] });
+        return JSON.stringify({ models: ["a", "b"] });
       }
       return "";
     });
@@ -112,7 +113,7 @@ describe("loadPluginConfig", () => {
 
     expect(result).not.toBeNull();
     // From project config
-    expect(result!.design_models).toEqual(["a", "b"]);
+    expect(result!.models).toEqual(["a", "b"]);
     // From user config — project didn't set it, so user's value survives
     expect(result!.topic_generator_model).toBe("gpt-4");
   });
@@ -127,12 +128,12 @@ describe("loadPluginConfig", () => {
     mockedReadFileSync.mockImplementation((p) => {
       if (p === userJson) {
         return JSON.stringify({
-          design_models: ["user-a", "user-b"],
+          models: ["user-a", "user-b"],
           topic_generator_model: "user-model",
         });
       }
       if (p === projJson) {
-        return JSON.stringify({ design_models: ["proj-a", "proj-b"] });
+        return JSON.stringify({ models: ["proj-a", "proj-b"] });
       }
       return "";
     });
@@ -140,18 +141,18 @@ describe("loadPluginConfig", () => {
     const result = loadPluginConfig("/tmp/test-proj");
 
     expect(result).not.toBeNull();
-    // Project overrides user on design_models
-    expect(result!.design_models).toEqual(["proj-a", "proj-b"]);
+    // Project overrides user on models
+    expect(result!.models).toEqual(["proj-a", "proj-b"]);
     // User's topic_generator_model survives since project didn't set it
     expect(result!.topic_generator_model).toBe("user-model");
   });
 
-  it("returns null and logs error for invalid config (too few design_models)", () => {
+  it("returns null and logs error for invalid config (too few models)", () => {
     const projJson = projectConfigJsonPath("/tmp/test-proj");
     mockedExistsSync.mockImplementation((p) => p === projJson);
     mockedReadFileSync.mockImplementation((p) => {
       if (p === projJson) {
-        return JSON.stringify({ design_models: ["only-one"] });
+        return JSON.stringify({ models: ["only-one"] });
       }
       return "";
     });
@@ -166,9 +167,7 @@ describe("loadPluginConfig", () => {
       string,
       unknown
     >;
-    expect(firstArg.projectConfigError).toContain(
-      "At least 2 design models required",
-    );
+    expect(firstArg.projectConfigError).toContain("At least 2 models required");
   });
 
   it("handles JSONC comments correctly", () => {
@@ -176,7 +175,7 @@ describe("loadPluginConfig", () => {
     const jsoncContent = [
       "{",
       "  // This is a line comment",
-      '  "design_models": ["model-a", "model-b"],',
+      '  "models": ["model-a", "model-b"],',
       "  /* Block comment",
       "     across multiple lines */",
       '  "base_output_dir": ".design-lab-custom"',
@@ -192,7 +191,70 @@ describe("loadPluginConfig", () => {
     const result = loadPluginConfig("/tmp/test-proj");
 
     expect(result).not.toBeNull();
-    expect(result!.design_models).toEqual(["model-a", "model-b"]);
+    expect(result!.models).toEqual(["model-a", "model-b"]);
     expect(result!.base_output_dir).toBe(".design-lab-custom");
+  });
+
+  it("loads arbitrary model variants and explicit null variants", () => {
+    const projJson = projectConfigJsonPath("/tmp/test-proj");
+    mockedExistsSync.mockImplementation((p) => p === projJson);
+    mockedReadFileSync.mockImplementation((p) => {
+      if (p === projJson) {
+        return JSON.stringify({
+          models: [
+            "openai/gpt-5.2-codex",
+            { model: "openai/gpt-5.2-codex", variant: "xhigh" },
+            { model: "local/model-without-variant", variant: null },
+          ],
+          default_variant: "max",
+        });
+      }
+      return "";
+    });
+
+    const result = loadPluginConfig("/tmp/test-proj");
+
+    expect(result).not.toBeNull();
+    expect(result!.models).toEqual([
+      "openai/gpt-5.2-codex",
+      { model: "openai/gpt-5.2-codex", variant: "xhigh" },
+      { model: "local/model-without-variant", variant: null },
+    ]);
+    expect(result!.default_variant).toBe("max");
+  });
+
+  it("allows a null default variant", () => {
+    const projJson = projectConfigJsonPath("/tmp/test-proj");
+    mockedExistsSync.mockImplementation((p) => p === projJson);
+    mockedReadFileSync.mockImplementation((p) => {
+      if (p === projJson) {
+        return JSON.stringify({
+          models: ["model-a", "model-b"],
+          default_variant: null,
+        });
+      }
+      return "";
+    });
+
+    const result = loadPluginConfig("/tmp/test-proj");
+
+    expect(result).not.toBeNull();
+    expect(result!.default_variant).toBeNull();
+  });
+
+  it("rejects legacy design_models without models", () => {
+    const projJson = projectConfigJsonPath("/tmp/test-proj");
+    mockedExistsSync.mockImplementation((p) => p === projJson);
+    mockedReadFileSync.mockImplementation((p) => {
+      if (p === projJson) {
+        return JSON.stringify({ design_models: ["model-a", "model-b"] });
+      }
+      return "";
+    });
+
+    const result = loadPluginConfig("/tmp/test-proj");
+
+    expect(result).toBeNull();
+    expect(mockedLoggerError).toHaveBeenCalled();
   });
 });
