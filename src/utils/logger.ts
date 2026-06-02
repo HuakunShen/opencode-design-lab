@@ -1,18 +1,60 @@
-import pino from "pino";
-import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
+import * as path from "path";
 
-const logLevel = process.env.LOG_LEVEL || "info";
+type LogLevel = "trace" | "debug" | "info" | "warn" | "error";
+type LogContext = Record<string, unknown>;
+type LogInput = string | LogContext;
+type LogMethod = (input: LogInput, message?: string) => void;
 
-const levelNames: Record<number, string> = {
-  10: "TRACE",
-  20: "DEBUG",
-  30: "INFO",
-  40: "WARN",
-  50: "ERROR",
-  60: "FATAL",
+const LOG_LEVELS: Record<LogLevel, number> = {
+  trace: 10,
+  debug: 20,
+  info: 30,
+  warn: 40,
+  error: 50,
 };
+
+const LOG_LEVEL_NAMES: Record<LogLevel, string> = {
+  trace: "TRACE",
+  debug: "DEBUG",
+  info: "INFO",
+  warn: "WARN",
+  error: "ERROR",
+};
+
+const configuredLevel = parseLogLevel(process.env.LOG_LEVEL);
+
+/**
+ * Minimal dependency-free file logger for plugin startup safety.
+ */
+export const logger: Record<LogLevel, LogMethod> = {
+  trace: createLogMethod("trace"),
+  debug: createLogMethod("debug"),
+  info: createLogMethod("info"),
+  warn: createLogMethod("warn"),
+  error: createLogMethod("error"),
+};
+
+function createLogMethod(level: LogLevel): LogMethod {
+  return (input, message) => {
+    if (LOG_LEVELS[level] < LOG_LEVELS[configuredLevel]) {
+      return;
+    }
+
+    const text = typeof input === "string" ? input : (message ?? "");
+    const context = typeof input === "string" ? undefined : input;
+    appendLogLine(formatLogLine(level, text, context));
+  };
+}
+
+function parseLogLevel(value: string | undefined): LogLevel {
+  const normalized = value?.toLowerCase();
+  if (normalized && normalized in LOG_LEVELS) {
+    return normalized as LogLevel;
+  }
+  return "info";
+}
 
 function formatTimestamp(): string {
   const now = new Date();
@@ -23,60 +65,58 @@ function formatTimestamp(): string {
   return `${hours}:${minutes}:${seconds}.${ms}`;
 }
 
-/**
- * Get the global config directory for logs (cross-platform)
- */
+function appendLogLine(line: string): void {
+  try {
+    fs.mkdirSync(getLogDirectory(), { recursive: true });
+    fs.appendFileSync(getLogPath(), `${line}\n`, "utf-8");
+  } catch {
+    // Logging must never prevent plugin startup.
+  }
+}
+
+function formatLogLine(
+  level: LogLevel,
+  message: string,
+  context: LogContext | undefined,
+): string {
+  const contextText = context ? ` ${stringifyContext(context)}` : "";
+  return `[${formatTimestamp()}] ${LOG_LEVEL_NAMES[level]}: ${message}${contextText}`;
+}
+
+function stringifyContext(context: LogContext): string {
+  try {
+    return JSON.stringify(context, jsonReplacer);
+  } catch (err) {
+    const error = err instanceof Error ? err.message : String(err);
+    return JSON.stringify({ logContextError: error });
+  }
+}
+
 function getLogDirectory(): string {
-  let configDir: string;
-
   if (process.platform === "win32") {
-    configDir =
-      process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming");
-  } else {
-    // macOS and Linux both use ~/.config
-    configDir =
-      process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config");
+    return path.join(
+      process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming"),
+      "opencode",
+    );
   }
 
-  const logDir = path.join(configDir, "opencode");
+  return path.join(
+    process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config"),
+    "opencode",
+  );
+}
 
-  // Ensure directory exists
-  if (!fs.existsSync(logDir)) {
-    fs.mkdirSync(logDir, { recursive: true });
+function getLogPath(): string {
+  return path.join(getLogDirectory(), "design-lab.log");
+}
+
+function jsonReplacer(_key: string, value: unknown): unknown {
+  if (value instanceof Error) {
+    return {
+      name: value.name,
+      message: value.message,
+      stack: value.stack,
+    };
   }
-
-  return logDir;
+  return value;
 }
-
-function createLogStream() {
-  const logDir = getLogDirectory();
-  const logPath = path.join(logDir, "design-lab.log");
-  const stream = fs.createWriteStream(logPath, { flags: "a" });
-
-  return pino.multistream([
-    {
-      level: "trace",
-      stream: {
-        write: (chunk: string) => {
-          try {
-            const log = JSON.parse(chunk);
-            const timestamp = formatTimestamp();
-            const level = levelNames[log.level as number] || "UNKNOWN";
-            const message = log.msg || "";
-            stream.write(`[${timestamp}] ${level}: ${message}\n`);
-          } catch (e) {
-            stream.write(chunk + "\n");
-          }
-        },
-      },
-    },
-  ]);
-}
-
-export const logger = pino(
-  {
-    level: logLevel,
-    timestamp: false,
-  },
-  createLogStream(),
-);

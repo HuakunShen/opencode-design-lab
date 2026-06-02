@@ -14,8 +14,8 @@ describe("published package metadata", () => {
     expect(packageJson.files).toContain("skills");
   });
 
-  it("declares runtime dependencies that may remain external after bundling", () => {
-    expect(packageJson.dependencies).toHaveProperty("pino");
+  it("does not publish logger-only runtime dependencies", () => {
+    expect(packageJson.dependencies).not.toHaveProperty("pino");
     expect(packageJson.dependencies).toHaveProperty("zod");
   });
 });
