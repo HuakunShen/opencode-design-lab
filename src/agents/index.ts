@@ -187,7 +187,7 @@ ${modelList}
 
 ## Config and output rules
 
-- Use the project Design Lab config from .opencode/design-lab.json or .opencode/design-lab.jsonc when you need runtime config details.
+- Use the project Design Lab config from .opencode/design-lab.json or .opencode/design-lab.jsonc when present; otherwise use the user-level Design Lab config at ~/.config/opencode/design-lab.json or ~/.config/opencode/design-lab.jsonc.
 - If config is missing or invalid, report: "Design Lab config not found or invalid. Run /design-lab:init to create one."
 - Create run directories under "${options.baseOutputDir}" using ${options.baseOutputDir}/YYYY-MM-DD-topic/.
 - Use short lowercase hyphenated topic slugs.

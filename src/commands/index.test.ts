@@ -36,17 +36,14 @@ describe("buildInitCommand", () => {
 });
 
 describe("command config access", () => {
-  it("keeps runtime command prompts inside the project workspace", () => {
+  it("includes user-level config fallback in runtime command prompts", () => {
     const commands = [
       buildAskCommand("/tmp/project"),
       buildRepowikiCommand("/tmp/project"),
     ];
 
-    for (const command of commands) {
-      expect(command.template).not.toContain("~/.config/opencode");
-      expect(command.template).not.toContain("user-level");
-    }
-
     expect(commands[0].template).toContain("/tmp/project/.opencode/design-lab");
+    expect(commands[0].template).toContain("user-level");
+    expect(commands[0].template).toContain(".config/opencode/design-lab.json");
   });
 });

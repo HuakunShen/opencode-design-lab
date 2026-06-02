@@ -68,9 +68,11 @@ $input
 
 ## Config Loading (MUST DO FIRST)
 
-1. Read the project Design Lab config from these paths in order:
+1. Read the Design Lab config from these paths in order:
    - ${directory}/.opencode/design-lab.json
    - ${directory}/.opencode/design-lab.jsonc
+   - user-level ~/.config/opencode/design-lab.json
+   - user-level ~/.config/opencode/design-lab.jsonc
 2. If no valid config is found, STOP and report:
     "Design Lab config not found or invalid. Run /design-lab:init to create one."
 3. Extract \`models\`, \`default_variant\`, and \`base_output_dir\`.

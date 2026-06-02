@@ -53,6 +53,8 @@ describe("design_lab agents", () => {
     expect(agent.prompt).toContain("Revision workflow");
     expect(agent.prompt).toContain("Blind review workflow");
     expect(agent.prompt).toContain("Current-code review workflow");
+    expect(agent.prompt).toContain("user-level Design Lab config");
+    expect(agent.prompt).toContain("~/.config/opencode/design-lab.json");
     expect(agent.prompt).toContain("Reviewer selection");
     expect(agent.prompt).toContain("design_lab_model_gpt52codex");
     expect(agent.prompt).toContain("variant: xhigh");
