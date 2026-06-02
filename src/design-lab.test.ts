@@ -38,6 +38,12 @@ describe("DesignLab plugin registration", () => {
     expect(config.command?.["design-lab:design"]).toBeUndefined();
     expect(config.command?.["design-lab:review"]).toBeUndefined();
     expect(config.command?.["design-lab:synthesize"]).toBeUndefined();
+    const configWithSkills = config as typeof config & {
+      skills?: { paths?: string[] };
+    };
+    expect(
+      configWithSkills.skills?.paths?.some((p) => p.endsWith("/skills")),
+    ).toBe(true);
 
     const agents = config.agent!;
     expect(agents.design_lab).toBeDefined();
@@ -59,6 +65,11 @@ describe("DesignLab plugin registration", () => {
     );
     expect("variant" in agents.design_lab_model_modelwithoutvariant!).toBe(
       false,
+    );
+
+    expect(hooks.tool?.design_lab_run).toBeDefined();
+    expect(hooks["experimental.chat.messages.transform"]).toBeTypeOf(
+      "function",
     );
   });
 });

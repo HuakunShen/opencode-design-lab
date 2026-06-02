@@ -7,9 +7,10 @@ summarizes results back into chat.
 
 ## Overview
 
-- **Single primary agent**: `design_lab` coordinates every workflow.
+- **Single coordinator agent**: `design_lab` coordinates every workflow and can run directly or through delegation.
 - **Model-specific subagents**: `design_lab_model_*` agents are generated from config.
 - **Current model inheritance**: `design_lab` does not set a fixed model, so OpenCode can use the active UI/default model for coordination.
+- **Default-agent activation**: the bundled `design-lab` skill can be loaded from the normal `build` agent when your prompt mentions multi-model design or review.
 - **Arbitrary variants**: model variants are passed through as configured, including values like `xhigh`.
 - **Review-only subagents**: model subagents write review files and never modify source code during review.
 - **File-first outputs**: full model responses, plans, reviews, manifests, and summaries are saved under `.design-lab/`.
@@ -25,6 +26,19 @@ summarizes results back into chat.
 
 You can also switch to the `design_lab` agent and ask directly without using
 `/design-lab:ask`. Direct agent usage follows the same workflow rules.
+
+You do not have to switch agents for common prompts. The plugin registers a
+bundled `design-lab` skill and nudges the current agent to load it when prompts
+mention multi-model design, multi-model review, blind review, or current-code
+review. The nudge is applied to the latest matching user turn, so it also works
+in an existing chat. After loading the skill, the current agent should call the
+native Task tool directly for each selected `design_lab_model_*` agent; this
+keeps every model worker visible as a top-level task card in the OpenCode UI. If
+the current agent is already `design_lab`, it runs the coordinator workflow
+directly instead of delegating back to itself. If native Task fanout is
+unavailable, the current agent can fall back to the `design_lab_run` tool, which
+starts a child `design_lab` session and returns the summary. Restart OpenCode after
+rebuilding or installing the plugin so the bundled skill and tool are available.
 
 ## Configuration
 
@@ -45,11 +59,11 @@ Create `.opencode/design-lab.json`:
 
 ### Options
 
-| Option            | Type                   | Default       | Description                                      |
-| ----------------- | ---------------------- | ------------- | ------------------------------------------------ |
-| `models`          | `(string \| object)[]` | Required      | Models used for all Design Lab workflows, min 2  |
-| `default_variant` | `string \| null`       | `"max"`       | Variant applied to plain string model entries    |
-| `base_output_dir` | `string`               | `.design-lab` | Output directory for run artifacts               |
+| Option            | Type                   | Default       | Description                                     |
+| ----------------- | ---------------------- | ------------- | ----------------------------------------------- |
+| `models`          | `(string \| object)[]` | Required      | Models used for all Design Lab workflows, min 2 |
+| `default_variant` | `string \| null`       | `"max"`       | Variant applied to plain string model entries   |
+| `base_output_dir` | `string`               | `.design-lab` | Output directory for run artifacts              |
 
 Model entries can be plain strings or objects:
 
@@ -101,6 +115,12 @@ files to reviewers.
 
 ```text
 /design-lab:ask review current changes with gpt and kimi only
+```
+
+From the normal `build` agent, this also works as a plain prompt:
+
+```text
+review current changes with multiple models
 ```
 
 The primary agent collects `git status`, `git diff`, changed files, and your

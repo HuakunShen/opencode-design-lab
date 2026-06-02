@@ -33,7 +33,7 @@ describe("design_lab agents", () => {
     });
   });
 
-  it("creates a primary agent that inherits the active OpenCode model", () => {
+  it("creates a coordinator agent that can run directly or through delegation", () => {
     const agent = createDesignLabPrimaryAgent({
       baseOutputDir: ".design-lab",
       models: [
@@ -46,7 +46,7 @@ describe("design_lab agents", () => {
       ],
     });
 
-    expect(agent.mode).toBe("primary");
+    expect(agent.mode).toBe("all");
     expect("model" in agent).toBe(false);
     expect(agent.prompt).toContain("Direct agent usage");
     expect(agent.prompt).toContain("Plan workflow");
@@ -56,8 +56,8 @@ describe("design_lab agents", () => {
     expect(agent.prompt).toContain("Reviewer selection");
     expect(agent.prompt).toContain("design_lab_model_gpt52codex");
     expect(agent.prompt).toContain("variant: xhigh");
-    expect(agent.tools?.delegate_task).toBe(true);
-    expect(agent.tools?.task).toBe(false);
+    expect(agent.tools?.task).toBe(true);
+    expect(agent.tools).not.toHaveProperty("delegate_task");
     expect(agent.permission?.edit).toBe("allow");
   });
 
@@ -67,18 +67,26 @@ describe("design_lab agents", () => {
     expect(agent.mode).toBe("subagent");
     expect(agent.model).toBe("openai/gpt-5.2-codex");
     expect(agent.variant).toBe("xhigh");
+    expect(agent.prompt).toContain("design_lab coordinator or current agent");
+    expect(agent.prompt).not.toContain(
+      "only from the design_lab primary agent",
+    );
     expect(agent.prompt).toContain("ONLY write to the exact output_file");
     expect(agent.prompt).toContain("Never modify project source files");
     expect(agent.prompt).toContain("During code review tasks");
     expect(agent.prompt).toContain("WROTE: <output_file>");
     expect(agent.tools?.write).toBe(true);
-    expect(agent.tools?.delegate_task).toBe(false);
+    expect(agent.tools?.task).toBe(false);
+    expect(agent.tools).not.toHaveProperty("delegate_task");
     expect(agent.permission?.bash).toBe("deny");
     expect(agent.permission?.edit).toBe("allow");
   });
 
   it("omits subagent variant when configured as null", () => {
-    const agent = createDesignLabModelAgent("local/model-without-variant", null);
+    const agent = createDesignLabModelAgent(
+      "local/model-without-variant",
+      null,
+    );
 
     expect(agent.model).toBe("local/model-without-variant");
     expect("variant" in agent).toBe(false);

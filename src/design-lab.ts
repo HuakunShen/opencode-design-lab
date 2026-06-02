@@ -1,4 +1,7 @@
 import type { Plugin } from "@opencode-ai/plugin";
+import * as fs from "fs";
+import * as path from "path";
+import { fileURLToPath } from "url";
 
 import {
   createDesignLabModelAgent,
@@ -14,7 +17,18 @@ import {
   buildRepowikiCommand,
 } from "./commands";
 import { loadPluginConfig } from "./config";
+import { injectDesignLabSkillNudge } from "./skills/design-lab-bootstrap";
+import { createDesignLabRunTool } from "./tools";
 import { logger } from "./utils/logger";
+
+const PLUGIN_DIR = path.dirname(fileURLToPath(import.meta.url));
+const SKILLS_DIR = resolveBundledSkillsDir(PLUGIN_DIR);
+
+type ConfigWithSkills = {
+  skills?: {
+    paths?: string[];
+  };
+};
 
 /**
  * OpenCode Design Lab Plugin
@@ -24,9 +38,15 @@ import { logger } from "./utils/logger";
  */
 export const DesignLab: Plugin = async (ctx) => {
   return {
+    tool: {
+      design_lab_run: createDesignLabRunTool(ctx),
+    },
+
     config: async (config) => {
       // Load configuration fresh in the config callback
       const pluginConfig = loadPluginConfig(ctx.directory);
+
+      registerSkillsPath(config as ConfigWithSkills, SKILLS_DIR);
 
       // Always register ALL commands unconditionally
       // The design/review/synthesize commands read config dynamically at runtime
@@ -83,8 +103,30 @@ export const DesignLab: Plugin = async (ctx) => {
         );
       }
     },
+
+    "experimental.chat.messages.transform": async (_input, output) => {
+      injectDesignLabSkillNudge(output);
+    },
   };
 };
+
+function resolveBundledSkillsDir(pluginDir: string): string {
+  const candidates = [
+    path.resolve(pluginDir, "../../skills"),
+    path.resolve(pluginDir, "../skills"),
+  ];
+  return (
+    candidates.find((candidate) => fs.existsSync(candidate)) ?? candidates[0]
+  );
+}
+
+function registerSkillsPath(config: ConfigWithSkills, skillsDir: string): void {
+  config.skills = config.skills ?? {};
+  config.skills.paths = config.skills.paths ?? [];
+  if (!config.skills.paths.includes(skillsDir)) {
+    config.skills.paths.push(skillsDir);
+  }
+}
 
 function uniqueNormalizedConfigs(
   configs: { model: string; variant: string | null }[],

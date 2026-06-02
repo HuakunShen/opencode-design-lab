@@ -72,7 +72,6 @@ export async function sendPrompt(
       tools: {
         ...tools,
         task: false,
-        delegate_task: false,
       },
       parts: [{ type: "text", text: prompt }],
     },

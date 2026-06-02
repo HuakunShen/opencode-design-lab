@@ -2,8 +2,8 @@
 
 ## System Overview
 
-OpenCode Design Lab registers one primary agent, `design_lab`, and one
-model-specific subagent per configured model. The primary agent coordinates
+OpenCode Design Lab registers one coordinator agent, `design_lab`, and one
+model-specific subagent per configured model. The coordinator agent coordinates
 multi-model planning, plan revision, anonymous plan review, general asks, and
 current-code review. Subagents are file-first workers: they write only the
 assigned artifact file and do not modify project source files during review.
@@ -12,10 +12,11 @@ assigned artifact file and do not modify project source files during review.
 
 ### Single Coordinator
 
-`design_lab` is the only command workflow primary agent. It does not set a
-`model` field, allowing OpenCode to use the active UI/default model for
-coordination. This avoids surprising model switches after invoking
-`/design-lab:ask`.
+`design_lab` is the only command workflow coordinator. It uses OpenCode agent
+mode `all`, so it can be selected directly and targeted through native
+delegation from another primary agent. It does not set a `model` field, allowing
+OpenCode to use the active UI/default model for coordination. This avoids
+surprising model switches after invoking `/design-lab:ask`.
 
 ### Model-Specific Workers
 
@@ -34,14 +35,34 @@ For current-code review, subagents only read the review packet and write review
 Markdown files. They must not edit source files. The primary agent may later edit
 code only if the user explicitly asks it to apply fixes.
 
+### Default-Agent Activation
+
+The plugin also registers a bundled OpenCode skill named `design-lab`. A
+Superpowers-style message transform detects multi-model design/review wording in
+the latest user message and prepends a small nudge asking the current agent to
+load the skill. The UI can stay on the normal `build` agent; the skill tells that
+agent to call native `task` directly for each selected `design_lab_model_*`
+subagent. This keeps every model worker visible as a top-level task card in the
+current OpenCode session. If the current agent is already `design_lab`, the nudge
+instructs it to run directly instead of delegating back to itself. The
+`design_lab_run` tool remains a fallback bridge for environments where native
+Task fanout is unavailable.
+
 ## Architecture
 
 ```text
-User prompt or /design-lab:ask
-  -> design_lab primary agent
+Default-agent user prompt
+  -> load design-lab skill
+  -> current agent selects workflow/model workers
+  -> task to each selected design_lab_model_* subagent at top level
+  -> verify output files
+  -> synthesize summary.md and chat response
+
+/design-lab:ask or direct design_lab agent usage
+  -> design_lab coordinator agent
   -> select workflow and reviewer/model subset
   -> create run directory and manifest
-  -> delegate to design_lab_model_* subagents
+  -> task to design_lab_model_* subagents inside that session
   -> verify output files
   -> synthesize summary.md and chat response
 ```
@@ -50,11 +71,18 @@ User prompt or /design-lab:ask
 
 `src/design-lab.ts` loads `DesignLabConfig`, normalizes `models`, and registers:
 
-- `design_lab`: primary coordinator with `delegate_task`, `read`, `write`, and `bash`.
+- `design_lab`: all-mode coordinator with `task`, `read`, `write`, and `bash`.
 - `design_lab_model_*`: subagents with `read` and `write` only.
+- `design_lab_run`: fallback tool bridge used by the current/default agent when native delegation is unavailable.
 
 The plugin no longer registers `designer`, `multi_model`, `designer_model_*`, or
 `multi_model_*`.
+
+The config hook also appends the package `skills/` directory to
+`config.skills.paths`, matching the Superpowers OpenCode plugin pattern. The
+`experimental.chat.messages.transform` hook adds a single
+`DESIGN_LAB_AUTO_TRIGGER` nudge to the latest matching user message and skips
+injection when that message already has the nudge.
 
 ## Configuration
 

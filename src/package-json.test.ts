@@ -11,6 +11,7 @@ describe("published package metadata", () => {
       "./server": "./.opencode/plugins/design-lab.js",
     });
     expect(packageJson.files).toContain(".opencode/plugins");
+    expect(packageJson.files).toContain("skills");
   });
 
   it("declares runtime dependencies that may remain external after bundling", () => {

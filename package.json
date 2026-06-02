@@ -19,7 +19,8 @@
     "./server": "./.opencode/plugins/design-lab.js"
   },
   "files": [
-    ".opencode/plugins"
+    ".opencode/plugins",
+    "skills"
   ],
   "scripts": {
     "build": "tsdown",

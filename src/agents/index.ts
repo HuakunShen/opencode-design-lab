@@ -65,7 +65,7 @@ export function normalizeModelConfig(
 }
 
 /**
- * Create the unified Design Lab primary agent configuration.
+ * Create the unified Design Lab coordinator agent configuration.
  */
 export function createDesignLabPrimaryAgent(
   options: DesignLabPrimaryAgentOptions,
@@ -73,15 +73,14 @@ export function createDesignLabPrimaryAgent(
   return {
     description:
       "Design Lab coordinator for multi-model plans, reviews, and synthesis.",
-    mode: "primary",
+    mode: "all",
     prompt: buildDesignLabPrimaryPrompt(options),
     tools: {
       read: true,
       write: true,
       bash: true,
-      delegate_task: true,
+      task: true,
       edit: false,
-      task: false,
     },
     permission: {
       bash: "allow",
@@ -111,7 +110,6 @@ export function createDesignLabModelAgent(
       edit: false,
       bash: false,
       task: false,
-      delegate_task: false,
     },
     permission: {
       bash: "deny",
@@ -124,11 +122,11 @@ export function createDesignLabModelAgent(
 function buildDesignLabSubagentPrompt(model: string): string {
   return `You are a Design Lab model subagent for model: ${model}.
 
-You receive tasks only from the design_lab primary agent. Your job is to write one assigned artifact file.
+You receive tasks from the design_lab coordinator or current agent. Your job is to write one assigned artifact file.
 
 ## Rules
 
-- ONLY write to the exact output_file path provided by the primary agent.
+- ONLY write to the exact output_file path provided by the coordinating agent.
 - Never modify project source files or files outside the requested output_file.
 - Never call other agents.
 - Keep chat output minimal.
@@ -153,7 +151,7 @@ You receive tasks only from the design_lab primary agent. Your job is to write o
 ## Review tasks
 
 - During code review tasks, read the provided review packet and write only your assigned review file.
-- During anonymous plan review tasks, read only the anonymous files provided by the primary agent.
+- During anonymous plan review tasks, read only the anonymous files provided by the coordinating agent.
 - Never modify project source files during review.
 - Do not attempt to guess which model wrote anonymous plans.
 - Evaluate purely on technical merit.
@@ -257,7 +255,7 @@ ${modelList}
 
 ## Failure handling
 
-- Inspect every delegate_task result. Do not assume success.
+- Inspect every task result. Do not assume success.
 - Treat "FAILED:", "Execute task failed", payment errors, rate limits, timeouts, empty responses, missing files, or empty files as failures.
 - Retry rate-limit and timeout failures once.
 - Skip payment/auth failures and continue with other models.
@@ -352,7 +350,6 @@ export function createDesignAgent(
       edit: false,
       bash: false,
       task: false,
-      delegate_task: false,
     },
   } as AgentConfig;
 }
@@ -419,7 +416,6 @@ export function createReviewAgent(
       edit: false,
       bash: false,
       task: false,
-      delegate_task: false,
     },
   } as AgentConfig;
 }
