@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { loadPluginConfig } from "./config";
+
 vi.mock("./config", () => ({
   loadPluginConfig: vi.fn(() => ({
     models: [
@@ -21,6 +23,8 @@ vi.mock("./utils/logger", () => ({
 }));
 
 import { DesignLab } from "./design-lab";
+
+const mockedLoadPluginConfig = vi.mocked(loadPluginConfig);
 
 describe("DesignLab plugin registration", () => {
   it("registers the single design_lab primary and configured model subagents", async () => {
@@ -71,5 +75,28 @@ describe("DesignLab plugin registration", () => {
     expect(hooks["experimental.chat.messages.transform"]).toBeTypeOf(
       "function",
     );
+  });
+
+  it("registers a fallback design_lab agent when config is missing", async () => {
+    mockedLoadPluginConfig.mockReturnValueOnce(null);
+    const hooks = await DesignLab({
+      directory: "/tmp/project",
+    } as Parameters<typeof DesignLab>[0]);
+    const config = {} as Parameters<NonNullable<typeof hooks.config>>[0];
+
+    await hooks.config?.(config);
+
+    expect(config.command?.["design-lab:ask"]?.agent).toBe("design_lab");
+    expect(config.command?.["design-lab:init"]).toBeDefined();
+    expect(config.command?.["design-lab:repowiki"]?.agent).toBe("design_lab");
+    expect(config.agent?.design_lab).toBeDefined();
+    expect(config.agent?.design_lab?.prompt).toContain(
+      "Design Lab config not found or invalid",
+    );
+    expect(config.agent?.design_lab?.prompt).toContain("/design-lab:init");
+    expect(Object.keys(config.agent ?? {})).not.toContain(
+      "design_lab_model_gpt52codex",
+    );
+    expect(hooks.tool?.design_lab_run).toBeDefined();
   });
 });

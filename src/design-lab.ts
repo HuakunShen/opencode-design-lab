@@ -4,6 +4,7 @@ import * as path from "path";
 import { fileURLToPath } from "url";
 
 import {
+  createDesignLabFallbackAgent,
   createDesignLabModelAgent,
   createDesignLabPrimaryAgent,
   getDesignerModelFileStem,
@@ -98,6 +99,11 @@ export const DesignLab: Plugin = async (ctx) => {
           "DesignLab agents and commands registered",
         );
       } else {
+        config.agent = {
+          ...(config.agent ?? {}),
+          design_lab: createDesignLabFallbackAgent(),
+        };
+
         logger.warn(
           "DesignLab config not found; design commands will prompt to run /design-lab:init",
         );

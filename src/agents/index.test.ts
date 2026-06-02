@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  createDesignLabFallbackAgent,
   createDesignLabModelAgent,
   createDesignLabPrimaryAgent,
   getDesignLabSubagentName,
@@ -61,6 +62,20 @@ describe("design_lab agents", () => {
     expect(agent.tools?.task).toBe(true);
     expect(agent.tools).not.toHaveProperty("delegate_task");
     expect(agent.permission?.edit).toBe("allow");
+  });
+
+  it("creates a no-config fallback coordinator agent with init guidance", () => {
+    const agent = createDesignLabFallbackAgent();
+
+    expect(agent.mode).toBe("all");
+    expect("model" in agent).toBe(false);
+    expect(agent.prompt).toContain("Design Lab config not found or invalid");
+    expect(agent.prompt).toContain("/design-lab:init");
+    expect(agent.prompt).toContain(".opencode/design-lab.json");
+    expect(agent.prompt).toContain("~/.config/opencode/design-lab.json");
+    expect(agent.prompt).not.toContain("Available model subagents");
+    expect(agent.tools?.task).toBe(false);
+    expect(agent.tools?.write).toBe(false);
   });
 
   it("creates a subagent with arbitrary variants", () => {

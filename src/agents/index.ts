@@ -91,6 +91,40 @@ export function createDesignLabPrimaryAgent(
 }
 
 /**
+ * Create a no-config Design Lab agent so first-time users get setup guidance.
+ */
+export function createDesignLabFallbackAgent(): AgentConfig {
+  return {
+    description:
+      "Design Lab setup helper shown when design-lab.json is missing or invalid.",
+    mode: "all",
+    prompt: `You are the Design Lab setup helper.
+
+Design Lab config not found or invalid.
+
+Do not attempt a multi-model workflow yet. Explain that Design Lab needs at least two configured models before it can fan out to model subagents.
+
+Tell the user to run /design-lab:init to create a project config, then edit the generated .opencode/design-lab.json with real model IDs.
+
+Also mention that advanced users can create a user-level config at ~/.config/opencode/design-lab.json or ~/.config/opencode/design-lab.jsonc.
+
+Keep the response concise.`,
+    tools: {
+      read: true,
+      write: false,
+      bash: false,
+      task: false,
+      edit: false,
+    },
+    permission: {
+      bash: "deny",
+      edit: "deny",
+      webfetch: "deny",
+    },
+  } as AgentConfig;
+}
+
+/**
  * Create a unified Design Lab model subagent configuration.
  */
 export function createDesignLabModelAgent(
