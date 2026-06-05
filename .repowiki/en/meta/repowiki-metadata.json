@@ -1,0 +1,101 @@
+{
+  "version": "2026-06-02",
+  "last_commit": "d0443fa8dd88039423ac427f10baca6012868952",
+  "wiki_items": [
+    {
+      "id": "0c7f7e63-6f28-4f45-8a32-4b321cc5df24",
+      "title": "System Overview",
+      "path": "content/System Overview.md"
+    },
+    {
+      "id": "7c87102e-668b-49c0-97be-0f179032c50f",
+      "title": "Getting Started Guide",
+      "path": "content/Getting Started Guide.md"
+    },
+    {
+      "id": "83c5464c-8d4f-4554-85f9-8fda0180bf46",
+      "title": "Architecture",
+      "path": "content/Architecture/Architecture.md"
+    },
+    {
+      "id": "aac58c67-f2b5-43bc-bcfe-f5d2f7dd66e5",
+      "title": "Agent Orchestration",
+      "path": "content/Architecture/Agent Orchestration.md"
+    },
+    {
+      "id": "ff5dd997-b4e3-4b22-98e6-6250e6dbbfae",
+      "title": "Configuration",
+      "path": "content/Configuration/Configuration.md"
+    },
+    {
+      "id": "8cc6352c-ef87-46dc-9402-3f660c4c64b2",
+      "title": "Development Workflow",
+      "path": "content/Development/Development Workflow.md"
+    }
+  ],
+  "knowledge_relations": [
+    {
+      "id": 1,
+      "source_id": "0c7f7e63-6f28-4f45-8a32-4b321cc5df24",
+      "target_id": "7c87102e-668b-49c0-97be-0f179032c50f",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "extra": "Wiki parent-child relationship: System Overview -> Getting Started Guide"
+    },
+    {
+      "id": 2,
+      "source_id": "0c7f7e63-6f28-4f45-8a32-4b321cc5df24",
+      "target_id": "83c5464c-8d4f-4554-85f9-8fda0180bf46",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "extra": "Wiki parent-child relationship: System Overview -> Architecture"
+    },
+    {
+      "id": 3,
+      "source_id": "83c5464c-8d4f-4554-85f9-8fda0180bf46",
+      "target_id": "aac58c67-f2b5-43bc-bcfe-f5d2f7dd66e5",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "extra": "Wiki parent-child relationship: Architecture -> Agent Orchestration"
+    },
+    {
+      "id": 4,
+      "source_id": "0c7f7e63-6f28-4f45-8a32-4b321cc5df24",
+      "target_id": "ff5dd997-b4e3-4b22-98e6-6250e6dbbfae",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "extra": "Wiki parent-child relationship: System Overview -> Configuration"
+    },
+    {
+      "id": 5,
+      "source_id": "0c7f7e63-6f28-4f45-8a32-4b321cc5df24",
+      "target_id": "8cc6352c-ef87-46dc-9402-3f660c4c64b2",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "PARENT_CHILD",
+      "extra": "Wiki parent-child relationship: System Overview -> Development Workflow"
+    },
+    {
+      "id": 6,
+      "source_id": "aac58c67-f2b5-43bc-bcfe-f5d2f7dd66e5",
+      "target_id": "ff5dd997-b4e3-4b22-98e6-6250e6dbbfae",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "REFERENCE",
+      "extra": "Agent orchestration depends on model and output configuration."
+    },
+    {
+      "id": 7,
+      "source_id": "8cc6352c-ef87-46dc-9402-3f660c4c64b2",
+      "target_id": "ff5dd997-b4e3-4b22-98e6-6250e6dbbfae",
+      "source_type": "WIKI_ITEM",
+      "target_type": "WIKI_ITEM",
+      "relationship_type": "REFERENCE",
+      "extra": "Development workflow includes schema export and config validation."
+    }
+  ]
+}

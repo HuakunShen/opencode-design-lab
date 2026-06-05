@@ -96,7 +96,7 @@ try {
 - Use the pino logger from `src/utils/logger.ts`
 - Use appropriate log levels: `trace`, `debug`, `info`, `warn`, `error`
 - Include structured context data in log calls
-- Logs are written to `design-lab.log` in the current working directory
+- Logs are written to `design-lab.log` under the global OpenCode config directory
 
 Example:
 
@@ -112,6 +112,8 @@ src/
 ├── design-lab.ts           # Plugin entry point
 ├── agents/                 # Agent configuration and prompts
 │   └── index.ts
+├── commands/               # Slash-command templates
+│   └── index.ts
 ├── config/                 # Configuration loading and schemas
 │   ├── schema.ts           # Zod schemas
 │   ├── loader.ts           # Config loading logic
@@ -123,6 +125,7 @@ src/
 │   └── index.ts
 └── utils/                  # Shared utilities
     ├── session-helpers.ts  # OpenCode session utilities
+    ├── lab-helpers.ts      # Design Lab output directory helpers
     ├── logger.ts           # Logging configuration
     └── schema-export.ts    # Schema generator
 ```
@@ -133,16 +136,18 @@ src/
 - Test files should be named `*.test.ts` alongside the source file
 - Use descriptive test names that explain what is being tested
 - Mock external dependencies (file system, network, OpenCode client)
-- Currently no tests exist in the main project - add them for new features
+- Tests currently cover config loading, agent factories, command templates, and plugin registration - add or update focused tests for new features
 
 ### Architecture Patterns
 
-- **Tools**: Use `tool()` factory from `@opencode-ai/plugin` with schema validation
-- **Agents**: Create agents via `createAgentSession()` + `sendPrompt()` + `pollForCompletion()`
+- **Commands**: Register slash-command templates from `src/commands/` unconditionally
+- **Agents**: Create primary `designer`/`multi_model` agents and model-specific subagents from config
+- **Delegation**: Primary agents use OpenCode `task`; avoid independent sessions for command workflows
+- **Tools**: `src/tools/` contains direct tool factories for legacy/session-helper workflows
 - **Config**: Load using `loadPluginConfig()`, merge user and project configs
 - **Schemas**: Define in Zod in `config/schema.ts`, export with `z.toJSONSchema()` (Zod v4)
-- **Session Management**: Use helpers in `utils/session-helpers.ts` for OpenCode session lifecycle
-- **Parallel Execution**: Run agents in parallel using Promise.allSettled for better performance
+- **Session Management**: Use helpers in `utils/session-helpers.ts` only for direct tool workflows
+- **Parallel Execution**: Prompt primary agents to fan out subagent delegation before waiting for results
 
 ### Comments and Documentation
 
@@ -163,8 +168,8 @@ src/
 
 - Plugin exports must be in `.opencode/plugins/` directory
 - Build output filename: `design-lab.js`
-- Session creation requires a parent session ID, title, and directory
-- Always disable write/edit/bash tools for subagents (except when explicitly needed)
+- Runtime commands are registered even when config is missing; agent registration requires valid config
+- Subagents are file-first: they should write only the assigned output file and return minimal status
 - Use timeout patterns to prevent hanging sessions (180s for send, 10min for poll)
 
 ### Constants
