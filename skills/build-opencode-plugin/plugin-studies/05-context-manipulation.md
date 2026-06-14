@@ -36,6 +36,7 @@ This plugin optimizes LLM context windows by:
 ```
 
 **Key takeaways**:
+
 - `output.maxOutputTokens` limits response length
 - `output.temperature` controls creativity (0 = deterministic, 1 = creative)
 - `output.topP` nucleus sampling parameter
@@ -82,6 +83,7 @@ This plugin optimizes LLM context windows by:
 ```
 
 **Key Insight**: Three levels of message manipulation:
+
 1. `chat.message` — per-message, before sending
 2. `experimental.chat.messages.transform` — the full message array
 3. `experimental.chat.system.transform` — the system prompt array
@@ -114,6 +116,7 @@ This plugin optimizes LLM context windows by:
 **Purpose**: More intrusive message manipulation (subject to breaking changes).
 
 **Message array transformation**:
+
 ```typescript
 "experimental.chat.messages.transform": async (input, output) => {
   // output.messages is the full array of { info: Message, parts: Part[] }
@@ -123,6 +126,7 @@ This plugin optimizes LLM context windows by:
 ```
 
 **System prompt transformation**:
+
 ```typescript
 "experimental.chat.system.transform": async (input, output) => {
   // output.system is string[] (system prompt lines)
@@ -131,6 +135,7 @@ This plugin optimizes LLM context windows by:
 ```
 
 **Session compaction**:
+
 ```typescript
 "experimental.session.compacting": async (input, output) => {
   // Called before compaction starts

@@ -66,7 +66,10 @@ describe("Design Lab skill bootstrap", () => {
     expect(triggerParts[0].text).toContain("Task tool");
     expect(triggerParts[0].text).toContain("subagent_type");
     expect(triggerParts[0].text).toContain(
-      "call `task` directly for each `design_lab_model_*`",
+      "call task directly for each design_lab_model_*",
+    );
+    expect(triggerParts[0].text).toContain(
+      "Launch all selected model task calls in parallel",
     );
     expect(triggerParts[0].text).toContain("top-level task card");
     expect(triggerParts[0].text).toMatch(

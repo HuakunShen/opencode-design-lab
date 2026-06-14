@@ -48,6 +48,7 @@ async config(input) {
 ```
 
 **Key takeaways**:
+
 - Runs before every shell command
 - Use to make API keys available to CLI tools
 - The `input` has: `{ cwd: string, sessionID?: string, callID?: string }`
@@ -97,7 +98,7 @@ for (const model of designModels) {
 config.command = {
   "design-lab:design": {
     description: "Generate design proposals...",
-    agent: "designer",           // Which agent handles this command
+    agent: "designer", // Which agent handles this command
     template: `Generate designs...
     
     Delegates to:
@@ -106,7 +107,7 @@ config.command = {
     
     $input  // User input placeholder
     `,
-  }
+  },
 };
 ```
 
@@ -167,7 +168,7 @@ config: async (config) => {
     "my-plugin:hello": {
       description: "Say hello",
       template: `Respond to the user. User said: $input`,
-      agent: "my-agent",  // Optional: which agent handles this command
+      agent: "my-agent", // Optional: which agent handles this command
     },
   };
 
@@ -175,7 +176,7 @@ config: async (config) => {
   config.agent = {
     ...(config.agent ?? {}),
     "my-agent": {
-      model: "claude-sonnet-4",  // Specific model for this agent
+      model: "claude-sonnet-4", // Specific model for this agent
       systemPrompt: "You are a helpful assistant...",
       // Optional: temperature, topP, etc.
     },
@@ -186,7 +187,7 @@ config: async (config) => {
     ...(config.instructions ?? []),
     "/path/to/instructions.md",
   ];
-}
+};
 ```
 
 **Example — Dynamic agent creation from config** (from `opencode-design-lab`):
@@ -195,7 +196,7 @@ config: async (config) => {
 // User config: { "design_models": ["claude-sonnet-4", "gpt-4o"] }
 for (const model of userConfig.design_models) {
   config.agent[`designer_model_${model}`] = {
-    model: model,  // Each agent locked to its model
+    model: model, // Each agent locked to its model
     systemPrompt: `You are a design agent using ${model}`,
   };
 }
@@ -211,11 +212,14 @@ config: async (config) => {
   config.skills.paths.push(join(import.meta.dirname, "skills"));
 
   // Add instruction files
-  config.instructions.push(join(import.meta.dirname, "skills", "rules", "install.md"));
+  config.instructions.push(
+    join(import.meta.dirname, "skills", "rules", "install.md"),
+  );
 };
 ```
 
 **Key takeaways**:
+
 - Commands use `$input` as user input placeholder in templates
 - Commands can specify which `agent` should handle them
 - Agents can be created dynamically from user config

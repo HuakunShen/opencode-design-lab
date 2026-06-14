@@ -17,6 +17,7 @@ I help maintain a project journal by documenting recent work, decisions, and arc
 ## When to use me
 
 Use this skill to document:
+
 - Significant feature completions.
 - Architectural decisions or changes in direction.
 - Resolution of complex bugs with specific rationale.
@@ -25,6 +26,7 @@ Use this skill to document:
 ## Entry Structure
 
 Each entry I create follows this structure:
+
 - **Timestamp**: The time of the entry.
 - **Core Decision/Topic**: The primary focus.
 - **Options Considered**: Alternatives that were discussed.
@@ -35,6 +37,7 @@ Each entry I create follows this structure:
 ## Implementation Instructions (for the Agent)
 
 When this skill is activated:
+
 1.  Get the current datetime in `YYYY-MM-DD-HHMM` format.
 2.  Run `git diff HEAD~1` (or appropriate range) to see recent changes.
 3.  Review the recent conversation history for context on "why" decisions were made.

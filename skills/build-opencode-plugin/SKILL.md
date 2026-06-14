@@ -26,6 +26,7 @@ export default myPlugin;
 ```
 
 **Package.json**:
+
 ```json
 {
   "name": "opencode-my-plugin",
@@ -39,6 +40,7 @@ export default myPlugin;
 ```
 
 **Install**: Add to `~/.config/opencode/opencode.json`:
+
 ```json
 { "plugin": ["opencode-my-plugin"] }
 ```
@@ -67,12 +69,12 @@ my-plugin/
 
 Most plugins use one of these:
 
-| Tool | Used By | Best For |
-|---|---|---|
-| **tsdown** | opencode-design-lab | Fast, zero-config, bundles dependencies |
-| **tsup** | opencode-supermemory | Fast, esbuild-based, good for libraries |
-| **rollup** | opencode-antigravity-auth | Full control, tree-shaking |
-| **tsc** | opencode-firecrawl | Simple, no bundling |
+| Tool       | Used By                   | Best For                                |
+| ---------- | ------------------------- | --------------------------------------- |
+| **tsdown** | opencode-design-lab       | Fast, zero-config, bundles dependencies |
+| **tsup**   | opencode-supermemory      | Fast, esbuild-based, good for libraries |
+| **rollup** | opencode-antigravity-auth | Full control, tree-shaking              |
+| **tsc**    | opencode-firecrawl        | Simple, no bundling                     |
 
 ### tsdown Configuration (Recommended)
 
@@ -83,16 +85,17 @@ From `opencode-design-lab`:
 import { defineConfig } from "tsdown";
 
 export default defineConfig({
-  entry: "./src/design-lab.ts",     // Your plugin entry file
-  outDir: ".opencode/plugins",      // Where the built file goes
-  exports: false,                   // Don't generate extra export files
-  dts: false,                       // Don't generate .d.ts (not needed)
+  entry: "./src/design-lab.ts", // Your plugin entry file
+  outDir: ".opencode/plugins", // Where the built file goes
+  exports: false, // Don't generate extra export files
+  dts: false, // Don't generate .d.ts (not needed)
   fixedExtension: false,
-  noExternal: ["pino", "zod"],      // Bundle these deps into the output
+  noExternal: ["pino", "zod"], // Bundle these deps into the output
 });
 ```
 
 **Critical options explained**:
+
 - `entry`: Your plugin's main TypeScript file — the one that `export default`s the plugin
 - `outDir`: Where the compiled `.js` goes. `.opencode/plugins/` is conventional but not required
 - `noExternal`: Dependencies to **bundle into** the output. Without this, OpenCode may fail to resolve them at runtime
@@ -106,9 +109,7 @@ export default defineConfig({
   "version": "1.0.0",
   "type": "module",
   "main": ".opencode/plugins/my-plugin.js",
-  "files": [
-    ".opencode/plugins"
-  ],
+  "files": [".opencode/plugins"],
   "scripts": {
     "build": "tsdown",
     "dev": "tsdown --watch",
@@ -125,6 +126,7 @@ export default defineConfig({
 ```
 
 **Key fields**:
+
 - `"main"`: Points to the **built** file, not the source. This is what OpenCode `require()`s
 - `"files"`: Only include the build output in the npm package. Don't ship `src/`
 - `"type": "module"`: OpenCode plugins must be ESM
@@ -148,6 +150,7 @@ npm publish
 ```
 
 **Why only ship the build?**
+
 - OpenCode loads plugins via `require("opencode-my-plugin")` which resolves to `"main"`
 - Source files are useless at runtime — OpenCode doesn't compile TypeScript
 - Smaller package size
@@ -191,6 +194,7 @@ When you add `"plugin": ["opencode-my-plugin"]` to your config:
 4. The returned `hooks` object is registered with the OpenCode runtime
 
 **If your plugin fails to load**, check:
+
 - Does `"main"` point to a file that exists after `npm run build`?
 - Is the file ESM (`"type": "module"` in package.json)?
 - Are dependencies either bundled (`noExternal`) or listed in `dependencies`?
@@ -200,13 +204,13 @@ When you add `"plugin": ["opencode-my-plugin"]` to your config:
 
 ## What Do You Want to Build?
 
-| I want to... | See this study | Hooks Covered |
-|---|---|---|
-| Build multi-agent orchestration, background tasks, session recovery | [01-orchestration-and-agents.md](./plugin-studies/01-orchestration-and-agents.md) | `config`, `event` |
-| Add auth (OAuth/API keys), custom providers, multi-account management | [02-auth-providers-and-accounts.md](./plugin-studies/02-auth-providers-and-accounts.md) | `auth`, `provider`, `tool`, `event` |
-| Register custom tools, chat context injection, external API integration | [03-tools-chat-and-external-apis.md](./plugin-studies/03-tools-chat-and-external-apis.md) | `tool`, `chat.message`, `tool.execute.*`, `event` |
-| Set up config, commands, dynamic agents, skill registration | [04-config-patterns.md](./plugin-studies/04-config-patterns.md) | `config`, `shell.env` |
-| Manipulate LLM context, modify parameters, control permissions | [05-context-manipulation.md](./plugin-studies/05-context-manipulation.md) | `chat.params`, `chat.headers`, `chat.message`, `permission.ask`, `experimental.*` |
+| I want to...                                                            | See this study                                                                            | Hooks Covered                                                                     |
+| ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Build multi-agent orchestration, background tasks, session recovery     | [01-orchestration-and-agents.md](./plugin-studies/01-orchestration-and-agents.md)         | `config`, `event`                                                                 |
+| Add auth (OAuth/API keys), custom providers, multi-account management   | [02-auth-providers-and-accounts.md](./plugin-studies/02-auth-providers-and-accounts.md)   | `auth`, `provider`, `tool`, `event`                                               |
+| Register custom tools, chat context injection, external API integration | [03-tools-chat-and-external-apis.md](./plugin-studies/03-tools-chat-and-external-apis.md) | `tool`, `chat.message`, `tool.execute.*`, `event`                                 |
+| Set up config, commands, dynamic agents, skill registration             | [04-config-patterns.md](./plugin-studies/04-config-patterns.md)                           | `config`, `shell.env`                                                             |
+| Manipulate LLM context, modify parameters, control permissions          | [05-context-manipulation.md](./plugin-studies/05-context-manipulation.md)                 | `chat.params`, `chat.headers`, `chat.message`, `permission.ask`, `experimental.*` |
 
 ---
 
@@ -214,23 +218,23 @@ When you add `"plugin": ["opencode-my-plugin"]` to your config:
 
 All available hooks from `@opencode-ai/plugin`:
 
-| Hook | Purpose | Study Reference |
-|---|---|---|
-| `config` | Register commands, agents, instructions, skills | [04-config-patterns.md](./plugin-studies/04-config-patterns.md) |
-| `tool` | Register custom AI-callable tools | [03-tools-chat-and-external-apis.md](./plugin-studies/03-tools-chat-and-external-apis.md) |
-| `auth` | Handle authentication (OAuth, API keys, custom fetch) | [02-auth-providers-and-accounts.md](./plugin-studies/02-auth-providers-and-accounts.md) |
-| `provider` | Register custom AI providers and models | [02-auth-providers-and-accounts.md](./plugin-studies/02-auth-providers-and-accounts.md) |
-| `chat.message` | Intercept/modify messages before LLM | [03-tools-chat-and-external-apis.md](./plugin-studies/03-tools-chat-and-external-apis.md) |
-| `chat.params` | Modify LLM parameters (temperature, tokens) | [05-context-manipulation.md](./plugin-studies/05-context-manipulation.md) |
-| `chat.headers` | Add custom HTTP headers to LLM requests | [05-context-manipulation.md](./plugin-studies/05-context-manipulation.md) |
-| `event` | Handle lifecycle events (session start, errors) | [01-orchestration-and-agents.md](./plugin-studies/01-orchestration-and-agents.md) |
-| `shell.env` | Inject env vars into shell commands | [04-config-patterns.md](./plugin-studies/04-config-patterns.md) |
-| `permission.ask` | Control tool execution permissions | [05-context-manipulation.md](./plugin-studies/05-context-manipulation.md) |
-| `tool.execute.before` | Intercept before tool execution | [03-tools-chat-and-external-apis.md](./plugin-studies/03-tools-chat-and-external-apis.md) |
-| `tool.execute.after` | Intercept after tool execution | [03-tools-chat-and-external-apis.md](./plugin-studies/03-tools-chat-and-external-apis.md) |
-| `experimental.chat.messages.transform` | Transform entire message array | [05-context-manipulation.md](./plugin-studies/05-context-manipulation.md) |
-| `experimental.chat.system.transform` | Modify system prompts | [05-context-manipulation.md](./plugin-studies/05-context-manipulation.md) |
-| `experimental.session.compacting` | Hook into session compaction | [05-context-manipulation.md](./plugin-studies/05-context-manipulation.md) |
+| Hook                                   | Purpose                                               | Study Reference                                                                           |
+| -------------------------------------- | ----------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `config`                               | Register commands, agents, instructions, skills       | [04-config-patterns.md](./plugin-studies/04-config-patterns.md)                           |
+| `tool`                                 | Register custom AI-callable tools                     | [03-tools-chat-and-external-apis.md](./plugin-studies/03-tools-chat-and-external-apis.md) |
+| `auth`                                 | Handle authentication (OAuth, API keys, custom fetch) | [02-auth-providers-and-accounts.md](./plugin-studies/02-auth-providers-and-accounts.md)   |
+| `provider`                             | Register custom AI providers and models               | [02-auth-providers-and-accounts.md](./plugin-studies/02-auth-providers-and-accounts.md)   |
+| `chat.message`                         | Intercept/modify messages before LLM                  | [03-tools-chat-and-external-apis.md](./plugin-studies/03-tools-chat-and-external-apis.md) |
+| `chat.params`                          | Modify LLM parameters (temperature, tokens)           | [05-context-manipulation.md](./plugin-studies/05-context-manipulation.md)                 |
+| `chat.headers`                         | Add custom HTTP headers to LLM requests               | [05-context-manipulation.md](./plugin-studies/05-context-manipulation.md)                 |
+| `event`                                | Handle lifecycle events (session start, errors)       | [01-orchestration-and-agents.md](./plugin-studies/01-orchestration-and-agents.md)         |
+| `shell.env`                            | Inject env vars into shell commands                   | [04-config-patterns.md](./plugin-studies/04-config-patterns.md)                           |
+| `permission.ask`                       | Control tool execution permissions                    | [05-context-manipulation.md](./plugin-studies/05-context-manipulation.md)                 |
+| `tool.execute.before`                  | Intercept before tool execution                       | [03-tools-chat-and-external-apis.md](./plugin-studies/03-tools-chat-and-external-apis.md) |
+| `tool.execute.after`                   | Intercept after tool execution                        | [03-tools-chat-and-external-apis.md](./plugin-studies/03-tools-chat-and-external-apis.md) |
+| `experimental.chat.messages.transform` | Transform entire message array                        | [05-context-manipulation.md](./plugin-studies/05-context-manipulation.md)                 |
+| `experimental.chat.system.transform`   | Modify system prompts                                 | [05-context-manipulation.md](./plugin-studies/05-context-manipulation.md)                 |
+| `experimental.session.compacting`      | Hook into session compaction                          | [05-context-manipulation.md](./plugin-studies/05-context-manipulation.md)                 |
 
 ---
 
@@ -244,13 +248,13 @@ Commands are prompt templates with `$input`:
 config.command = {
   "my-command": {
     description: "Does something useful",
-    agent: "my-agent",  // Optional routing
+    agent: "my-agent", // Optional routing
     template: `You are doing X. Follow these steps:
 1. First step
 2. Second step
 
 User input: $input`,
-  }
+  },
 };
 ```
 
@@ -290,7 +294,7 @@ await client.tui.showToast({
   body: {
     title: "Rate Limit",
     message: `Account ${email} rate limited. Switching...`,
-    variant: "warning",  // "info" | "warning" | "success" | "error"
+    variant: "warning", // "info" | "warning" | "success" | "error"
   },
 });
 ```
@@ -303,21 +307,21 @@ await client.tui.showToast({
 
 **Research finding**: In all studied plugins, task delegation is done via **prompts**, not code.
 
-| Approach | Example | Used By |
-|---|---|---|
-| Pure prompt | "Delegate to agent X to do Y" | oh-my-opencode, design-lab |
-| System function | `task()`, `call_omo_agent()` | oh-my-opencode built-ins |
-| Code-based | Programmatic subagent spawning | Not found in any studied plugin |
+| Approach        | Example                        | Used By                         |
+| --------------- | ------------------------------ | ------------------------------- |
+| Pure prompt     | "Delegate to agent X to do Y"  | oh-my-opencode, design-lab      |
+| System function | `task()`, `call_omo_agent()`   | oh-my-opencode built-ins        |
+| Code-based      | Programmatic subagent spawning | Not found in any studied plugin |
 
 **Recommendation**: Use prompts for delegation. The AI understands natural language instructions better than programmatic APIs for complex task routing.
 
 ### Config: File vs Environment Variable
 
-| Config Source | Best For | Example |
-|---|---|---|
-| Plugin config file | Complex nested settings | antigravity-auth |
-| Environment variables | Secrets, simple flags | supermemory, firecrawl |
-| OpenCode config | Agent/models config | oh-my-opencode |
+| Config Source         | Best For                | Example                |
+| --------------------- | ----------------------- | ---------------------- |
+| Plugin config file    | Complex nested settings | antigravity-auth       |
+| Environment variables | Secrets, simple flags   | supermemory, firecrawl |
+| OpenCode config       | Agent/models config     | oh-my-opencode         |
 
 ### Logging
 
@@ -341,20 +345,21 @@ Pure prompt-based parallel execution is not deterministic:
 
 ```typescript
 // Prompt-only approach — AI might do them sequentially
-template: `Fire all delegate_task calls simultaneously...`
+template: `Fire all delegate_task calls simultaneously...`;
 ```
 
 ### The Solution: Background Tasks
 
 oh-my-opencode implements **actual parallel execution** via built-in tools:
 
-| Tool | Purpose |
-|---|---|
-| `task()` | Launch background agent — returns `task_id` immediately |
-| `background_output()` | Collect results after agent completes |
-| `background_cancel()` | Cancel a running task |
+| Tool                  | Purpose                                                 |
+| --------------------- | ------------------------------------------------------- |
+| `task()`              | Launch background agent — returns `task_id` immediately |
+| `background_output()` | Collect results after agent completes                   |
+| `background_cancel()` | Cancel a running task                                   |
 
 **Usage pattern**:
+
 ```
 // Fire 3 agents in parallel:
 task(agent="explore", prompt="Find auth patterns...")      // returns task_a
@@ -374,28 +379,34 @@ background_output(task_id="task_c")
 Plugins can build similar patterns using the OpenCode SDK:
 
 ```typescript
-async function runAgentsInParallel(prompts: { agent: string; prompt: string }[]) {
+async function runAgentsInParallel(
+  prompts: { agent: string; prompt: string }[],
+) {
   const tasks = await Promise.all(
     prompts.map(async ({ agent, prompt }) => {
       const session = await client.session.create({
-        body: { title: `Background: ${agent}`, directory, parentID: ctx.session?.id },
+        body: {
+          title: `Background: ${agent}`,
+          directory,
+          parentID: ctx.session?.id,
+        },
       });
       await client.session.prompt({
         path: { id: session.data!.id },
         body: { parts: [{ type: "text", text: prompt }], agent },
       });
       return session.data!.id;
-    })
+    }),
   );
-  return tasks;  // All sessions running in parallel
+  return tasks; // All sessions running in parallel
 }
 ```
 
-| Approach | Best For | Complexity | Determinism |
-|---|---|---|---|
-| Prompt instructions | Simple cases, 2-3 agents | Low | Low |
-| Background task tools | Heavy orchestration, 5+ agents | High | High |
-| Programmatic SDK | Plugin-managed parallelism | High | Highest |
+| Approach              | Best For                       | Complexity | Determinism |
+| --------------------- | ------------------------------ | ---------- | ----------- |
+| Prompt instructions   | Simple cases, 2-3 agents       | Low        | Low         |
+| Background task tools | Heavy orchestration, 5+ agents | High       | High        |
+| Programmatic SDK      | Plugin-managed parallelism     | High       | Highest     |
 
 ---
 
@@ -405,11 +416,11 @@ async function runAgentsInParallel(prompts: { agent: string; prompt: string }[])
 type Plugin = (input: PluginInput, options?: PluginOptions) => Promise<Hooks>;
 
 type PluginInput = {
-  client: ReturnType<typeof createOpencodeClient>;  // OpenCode client API
-  project: Project;                                   // Project metadata
-  directory: string;                                  // Project root path
-  worktree: string;                                   // Git worktree path
-  serverUrl: URL;                                     // OpenCode server URL
-  $: BunShell;                                        // Shell utility
+  client: ReturnType<typeof createOpencodeClient>; // OpenCode client API
+  project: Project; // Project metadata
+  directory: string; // Project root path
+  worktree: string; // Git worktree path
+  serverUrl: URL; // OpenCode server URL
+  $: BunShell; // Shell utility
 };
 ```

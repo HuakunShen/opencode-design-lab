@@ -53,6 +53,7 @@ A clean, well-structured example of integrating an external API (Supermemory) wi
 ```
 
 **Key Insight**: The `chat.message` hook lets plugins:
+
 - Read the user's message from `output.parts`
 - Inject synthetic parts (invisible to user) into `output.parts` via `parts.push()` or `parts.unshift()`
 - Use `input.sessionID` to track per-session state
@@ -63,12 +64,12 @@ A clean, well-structured example of integrating an external API (Supermemory) wi
 
 ```typescript
 type Part = {
-  id: string;           // Unique part ID
-  sessionID: string;    // Session this part belongs to
-  messageID: string;    // Parent message ID
-  type: "text";         // Part type
-  text: string;         // Part content
-  synthetic: boolean;   // true = hidden from user, only visible to LLM
+  id: string; // Unique part ID
+  sessionID: string; // Session this part belongs to
+  messageID: string; // Parent message ID
+  type: "text"; // Part type
+  text: string; // Part content
+  synthetic: boolean; // true = hidden from user, only visible to LLM
 };
 ```
 
@@ -142,6 +143,7 @@ const googleSearchTool = tool({
 ```
 
 **Key takeaways**:
+
 - `tool.schema` provides Zod-like validation (`.string()`, `.enum()`, `.number()`, `.array()`, `.optional()`, `.describe()`, `.default()`)
 - `execute` returns a string that the AI sees as tool output
 - Return JSON strings for structured data (AI parses it well)
@@ -178,7 +180,7 @@ event: async (input) => {
   if (compactionHook) {
     await compactionHook.event(input);
   }
-}
+};
 ```
 
 **Key Insight**: Event hooks can be chained. The compaction hook uses events to detect when context windows are full and needs compression.

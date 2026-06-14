@@ -62,6 +62,10 @@ describe("design_lab agents", () => {
     expect(agent.tools?.task).toBe(true);
     expect(agent.tools).not.toHaveProperty("delegate_task");
     expect(agent.permission?.edit).toBe("allow");
+    expect(agent.prompt).toContain("Task fanout rules");
+    expect(agent.prompt).toContain(
+      "Launch all selected model tasks in parallel",
+    );
   });
 
   it("creates a no-config fallback coordinator agent with init guidance", () => {

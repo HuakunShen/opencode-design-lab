@@ -36,12 +36,12 @@ config.command = {
   "ulw-loop": {
     template: "Start ultrawork loop until completion",
     agent: "sisyphus",
-    description: "Start self-referential development loop"
+    description: "Start self-referential development loop",
   },
   "init-deep": {
     template: "Generate hierarchical AGENTS.md files...",
-    description: "Initialize hierarchical AGENTS.md knowledge base"
-  }
+    description: "Initialize hierarchical AGENTS.md knowledge base",
+  },
 };
 ```
 
@@ -70,9 +70,9 @@ oh-my-opencode implements "Skill-Embedded MCPs" — skills carry their own MCP s
 
 ```typescript
 // Using the session tools
-session_list({ project_path: directory })  // List sessions
-session_read({ session_id: "ses_xxx" })     // Read session messages
-session_search({ query: "some text" })      // Search across sessions
+session_list({ project_path: directory }); // List sessions
+session_read({ session_id: "ses_xxx" }); // Read session messages
+session_search({ query: "some text" }); // Search across sessions
 ```
 
 ## How It Uses Event Hooks
@@ -89,7 +89,7 @@ event: async (input) => {
   if (input.event.type === "session.created") {
     const props = input.event.properties as { info?: { parentID?: string } };
     if (props?.info?.parentID) {
-      isChildSession = true;  // Used to filter toasts in child sessions
+      isChildSession = true; // Used to filter toasts in child sessions
     }
   }
 
@@ -105,10 +105,11 @@ event: async (input) => {
       });
     }
   }
-}
+};
 ```
 
 **Key takeaways**:
+
 - `session.created` — track parent/child session relationships
 - `session.error` — implement auto-recovery
 - `session.deleted` — cleanup resources
@@ -149,12 +150,12 @@ src/tools/background-task/
 ### How Parallel Execution Works
 
 ```
-Step 1: AI calls task(agent="explore", prompt="...") 
-  → BackgroundManager.launch() creates child session  
-  → Returns task_id immediately  
+Step 1: AI calls task(agent="explore", prompt="...")
+  → BackgroundManager.launch() creates child session
+  → Returns task_id immediately
   → Agent starts, runs in background session
 
-Step 2: AI calls task() again for another agent  
+Step 2: AI calls task() again for another agent
   → Second session starts in parallel (no waiting)
 
 Step 3: <system-reminder> notifies when each task completes
@@ -163,6 +164,7 @@ Step 4: AI calls background_output(task_id="...") to get results
 ```
 
 **Key architectural components**:
+
 - `BackgroundManager` — singleton managing all background tasks, tracks lifecycle (pending → running → completed/error/cancelled)
 - Child sessions inherit parent context (model, agent, conversation)
 - `full_session` flag in background_output returns full message history

@@ -42,7 +42,7 @@ Use the OpenCode skill tool to load \`design-lab\` before proceeding.
 Stay in the current agent; do not ask the user to switch agents.
 If you are already \`design_lab\`, do not load this skill or delegate back to
 \`design_lab\`; run the workflow directly.
-After loading the skill, stay in the current agent and call \`task\` directly for each \`design_lab_model_*\` agent selected by the workflow, using that model agent name as the \`subagent_type\`. Do not call \`task\` with \`design_lab\` from the current/default agent, because that hides model workers one level down. Each model worker should appear as a top-level task card. The loaded skill owns model selection, output paths, manifests, and synthesis. Fallback: use \`design_lab_run\` only when native Task tool fanout is unavailable.
+After loading the skill, stay in the current agent and call task directly for each design_lab_model_* agent selected by the workflow, using that model agent name as the subagent_type. Launch all selected model task calls in parallel before waiting for any individual result. Do not call task with design_lab from the current/default agent, because that hides model workers one level down. Each model worker should appear as a top-level task card. The loaded skill owns model selection, output paths, manifests, and synthesis. Fallback: use design_lab_run only when native Task tool fanout is unavailable.
 </${DESIGN_LAB_AUTO_TRIGGER_TAG}>`;
 
 /**

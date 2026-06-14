@@ -1,4 +1,5 @@
 import type { Plugin } from "@opencode-ai/plugin";
+import type { Provider } from "@opencode-ai/sdk";
 import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
@@ -18,6 +19,7 @@ import {
   buildRepowikiCommand,
 } from "./commands";
 import { loadPluginConfig } from "./config";
+import type { DesignLabConfig } from "./config/schema";
 import { injectDesignLabSkillNudge } from "./skills/design-lab-bootstrap";
 import { createDesignLabRunTool } from "./tools";
 import { logger } from "./utils/logger";
@@ -30,6 +32,42 @@ type ConfigWithSkills = {
     paths?: string[];
   };
 };
+
+async function validateModelIds(
+  ctx: { client: { config: { providers: Function } } },
+  config: DesignLabConfig,
+): Promise<void> {
+  const configuredIds = config.models.map((m) =>
+    typeof m === "string" ? m : m.model,
+  );
+
+  try {
+    const res = await ctx.client.config.providers();
+    const providerList: Provider[] | undefined = res.data?.providers;
+    if (!providerList) {
+      return;
+    }
+
+    const availableModelIds = new Set(
+      providerList.flatMap((p: Provider) => Object.keys(p.models)),
+    );
+
+    for (const modelId of configuredIds) {
+      if (!availableModelIds.has(modelId)) {
+        logger.warn(
+          { model: modelId },
+          `Model "${modelId}" not found among available providers. It may fail at runtime if the provider is not configured.`,
+        );
+      }
+    }
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    logger.warn(
+      { error: errorMsg },
+      "Could not validate model IDs against available providers. Continuing with configured models.",
+    );
+  }
+}
 
 /**
  * OpenCode Design Lab Plugin
@@ -61,6 +99,8 @@ export const DesignLab: Plugin = async (ctx) => {
 
       if (pluginConfig) {
         logger.info("Design Lab Plugin Loaded");
+
+        await validateModelIds(ctx as any, pluginConfig);
 
         const modelConfigs = pluginConfig.models.map((cfg) =>
           normalizeModelConfig(cfg, pluginConfig.default_variant),

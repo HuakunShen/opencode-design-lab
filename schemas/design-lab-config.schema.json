@@ -34,9 +34,7 @@
                 ]
               }
             },
-            "required": [
-              "model"
-            ],
+            "required": ["model"],
             "additionalProperties": false
           }
         ]

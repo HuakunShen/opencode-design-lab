@@ -102,6 +102,7 @@ auth: {
 ```
 
 **Key takeaways**:
+
 - The `loader` returns `{ apiKey }` for simple auth, or `{ apiKey, fetch }` for custom fetch
 - Custom `fetch` intercepts every LLM API call — use for: token injection, refresh, retry, rate limiting, request/response transformation
 - `auth.methods` defines how users authenticate (OAuth or API key)
@@ -135,6 +136,7 @@ provider: {
 ```
 
 **Key takeaways**:
+
 - `provider.id` identifies the provider
 - `provider.models` dynamically resolves available models
 - Set `cost: { input: 0, output: 0 }` in the auth loader to hide costs for custom providers
@@ -153,14 +155,19 @@ const googleSearchTool = tool({
     // Uses the auth context to make authenticated API calls
     const auth = cachedGetAuth ? await cachedGetAuth() : null;
     // ...search implementation
-    return executeSearch({ query, urls, thinking }, accessToken, projectId, ctx.abort);
+    return executeSearch(
+      { query, urls, thinking },
+      accessToken,
+      projectId,
+      ctx.abort,
+    );
   },
 });
 
 return {
   tool: {
     google_search: googleSearchTool,
-  }
+  },
 };
 ```
 
@@ -177,7 +184,7 @@ event: async (input) => {
       isChildSession = true;
     }
   }
-  
+
   // Handle session.error - auto-recovery
   if (input.event.type === "session.error") {
     const error = props?.error;
@@ -191,7 +198,7 @@ event: async (input) => {
       });
     }
   }
-}
+};
 ```
 
 **Key Insight**: The event hook handles lifecycle events. `session.error` enables auto-recovery. `session.created` lets plugins track session hierarchies (parent/child).
@@ -206,7 +213,12 @@ initTokenTracker({
 });
 
 // Exponential backoff with account rotation
-function getRateLimitBackoff(accountIndex, quotaKey, serverRetryAfterMs, maxBackoffMs) {
+function getRateLimitBackoff(
+  accountIndex,
+  quotaKey,
+  serverRetryAfterMs,
+  maxBackoffMs,
+) {
   // Track consecutive 429s per account+quota
   // Rotate to next account when threshold exceeded
   // Use server's retry-after header when available
@@ -214,12 +226,13 @@ function getRateLimitBackoff(accountIndex, quotaKey, serverRetryAfterMs, maxBack
 
 // Proactive token refresh before expiry
 refreshQueue = createProactiveRefreshQueue(client, providerId, {
-  bufferSeconds: 300,  // Refresh 5 min before expiry
+  bufferSeconds: 300, // Refresh 5 min before expiry
   checkIntervalSeconds: 60,
 });
 ```
 
 **Key Insight**: Production auth plugins need sophisticated rate limiting with:
+
 - Account rotation (multiple API keys/accounts)
 - Token bucket rate limiting per account
 - Proactive token refresh before expiry
@@ -229,10 +242,10 @@ refreshQueue = createProactiveRefreshQueue(client, providerId, {
 
 ```typescript
 await client.tui.showToast({
-  body: { 
+  body: {
     title: "Rate Limit",
     message: `Rate limited, waiting ${delay}s`,
-    variant: "warning"  // "info" | "warning" | "success" | "error"
+    variant: "warning", // "info" | "warning" | "success" | "error"
   },
 });
 ```
@@ -242,8 +255,8 @@ await client.tui.showToast({
 ## Configuration Loading
 
 ```typescript
-const config = loadConfig(directory);  // From files + env vars
-initRuntimeConfig(config);              // Apply to runtime
+const config = loadConfig(directory); // From files + env vars
+initRuntimeConfig(config); // Apply to runtime
 ```
 
 **Key Insight**: Config can be loaded from multiple sources: plugin config file, environment variables, OpenCode user config. The `directory` from `PluginInput` is the project root.

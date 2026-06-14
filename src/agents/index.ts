@@ -219,6 +219,13 @@ ${modelList}
 - Use only the model subagents listed above. Never invent agent names.
 - The primary agent intentionally has no fixed model configured so OpenCode can use the active UI/default model for coordination.
 
+## Task fanout rules
+
+- Use the native task tool to fan out to model subagents.
+- Launch all selected model tasks in parallel before waiting for any individual result.
+- Do not await one subagent before starting another.
+- Verify every expected output file exists and has non-trivial content only after all tasks settle.
+
 ## Config and output rules
 
 - Use the project Design Lab config from .opencode/design-lab.json or .opencode/design-lab.jsonc when present; otherwise use the user-level Design Lab config at ~/.config/opencode/design-lab.json or ~/.config/opencode/design-lab.jsonc.
@@ -242,7 +249,7 @@ ${modelList}
 
 1. Create a run directory with prompt.md, responses/, manifest.json, and summary.md.
 2. Write the original prompt to prompt.md.
-3. Delegate the same prompt to selected or all model subagents in parallel.
+3. Launch native task calls for all selected model subagents in parallel.
 4. Each subagent writes responses/{fileStem}.md.
 5. Verify every response file exists and has non-trivial content.
 6. Read successful responses and write summary.md with consensus, disagreements, model notes, final recommendation, and failures.
@@ -250,7 +257,7 @@ ${modelList}
 ## Plan workflow
 
 1. Create a run directory with prompt.md, plans/, manifest.json, and summary.md.
-2. Delegate plan generation to all configured models unless the user explicitly selects a subset.
+2. Launch all selected model task calls in parallel unless the user explicitly selected a single model.
 3. Each subagent writes plans/{fileStem}.md.
 4. Write manifest.json mapping each model to its agentName, variant, fileStem, planFile, and blindLabel.
 5. Summarize the generated plans without exposing excessive content in chat.
@@ -259,7 +266,7 @@ ${modelList}
 
 1. Locate the run directory from the user request or use the most recent run under ${options.baseOutputDir}.
 2. Read manifest.json to map each model to its own plan file.
-3. Delegate revision tasks in parallel to the matching model subagents.
+3. Launch revision task calls for all matching model subagents in parallel.
 4. Each subagent reads and rewrites only its own plans/{fileStem}.md file.
 5. Rebuild blind copies after revision if the run has prior blind review state.
 6. Summarize revised files and failures.
@@ -270,7 +277,7 @@ ${modelList}
 2. Create blinds/plans-blind/ and blinds/mapping.json.
 3. Copy each successful plan to an anonymous file such as blinds/plans-blind/plan-a.md, stripping model names and agent names.
 4. Never show blinds/mapping.json to review subagents.
-5. Delegate reviews only to selected reviewers or all models by default.
+5. Launch all selected reviewer task calls in parallel.
 6. Reviewers receive only the anonymous plan directory and their exact output_file under reviews/.
 7. After reviews finish, read blinds/mapping.json yourself and write summary.md using real model names.
 
@@ -280,7 +287,7 @@ ${modelList}
 2. Create context/ and reviews/ in a run directory.
 3. Collect review context with bash/read tools: git status, git diff, changed file list, and the user's stated review focus.
 4. Write context/review-request.md, context/git-status.txt, context/diff.patch, and context/changed-files.txt.
-5. Delegate review-only tasks to selected reviewers or all models by default.
+5. Launch all selected reviewer task calls in parallel.
 6. Each review subagent reads the context packet and writes reviews/code-review-{fileStem}.md.
 7. Review subagents MUST NOT edit source code. If a subagent edits source code, treat it as failed and report it.
 8. Read all review files, evaluate whether findings are reasonable, identify consensus and questionable suggestions, then write summary.md.
