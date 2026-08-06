@@ -20,6 +20,7 @@ import {
 } from "./commands";
 import { loadPluginConfig } from "./config";
 import type { DesignLabConfig } from "./config/schema";
+import { createGoalsHooks } from "./goals";
 import { injectDesignLabSkillNudge } from "./skills/design-lab-bootstrap";
 import { createDesignLabRunTool } from "./tools";
 import { logger } from "./utils/logger";
@@ -76,9 +77,17 @@ async function validateModelIds(
  * then systematically evaluates, compares, and ranks those designs.
  */
 export const DesignLab: Plugin = async (ctx) => {
+  // Goals options resolve lazily from the design-lab config; missing config
+  // yields built-in defaults. createGoalsHooks is synchronous.
+  const goalsHooks = createGoalsHooks(ctx.client as never, () =>
+    loadPluginConfig(ctx.directory),
+  );
+
   return {
+    ...goalsHooks, // spreads event/command.execute.before/chat.message/tool.execute.before/experimental.*
     tool: {
       design_lab_run: createDesignLabRunTool(ctx),
+      ...(goalsHooks.tool ?? {}),
     },
 
     config: async (config) => {
@@ -148,6 +157,10 @@ export const DesignLab: Plugin = async (ctx) => {
           "DesignLab config not found; design commands will prompt to run /design-lab:init",
         );
       }
+
+      // Register the /goal command and goal tools after design-lab's own
+      // commands; both merge into config.command so nothing is overwritten.
+      if (goalsHooks.config) await goalsHooks.config(config);
     },
 
     "experimental.chat.messages.transform": async (_input, output) => {

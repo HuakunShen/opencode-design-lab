@@ -168,6 +168,47 @@ Current-code review runs use:
 └── summary.md
 ```
 
+## Goal Mode
+
+Set a session-scoped goal and the plugin keeps working autonomously until it is
+complete, blocked, or a safety limit is reached — like Codex/Claude goal mode.
+
+```bash
+/goal fix the failing tests and verify the suite passes
+/goal ship the release --success "tests pass and changelog updated" --max-turns 20
+/goal status        # current state, budget usage, last checkpoint
+/goal history       # lifecycle history
+/goal pause         # pause without clearing
+/goal resume        # continue with a fresh budget window
+/goal clear         # discard the goal
+/goal add <cond>    # background the current goal, focus a new one
+/goal list          # numbered live goals
+/goal focus <n>     # switch focus
+/goal sequence a; b; c   # run objectives one at a time, auto-promoting
+```
+
+Completion requires evidence:
+
+```
+[goal:evidence] ran npm test (83 passing), verified the build output
+[goal:complete]
+```
+
+Safety limits (configurable under `"goals"` in design-lab.json): 10 auto-continue
+turns, 15 minutes, 200k context tokens, 1.5s minimum delay, no-progress pause
+(< 50 output tokens, 2-turn grace), no-tool-call pause (2 turns), 80% budget
+wrap-up, 3 prompt-failure circuit breaker. Goals persist to
+`.opencode/goals/` and survive compaction and restarts (recovered paused).
+
+Plan-mode safety: goals created from the `plan` agent stay paused; auto-continue
+never escapes Plan mode; resume from Plan mode is refused. Override with
+`"goals": { "allow_goal_execution_from_plan": true }`.
+
+Agent tools: `goal_status`, `goal_set`, `goal_pause`, `goal_resume`, `goal_block`,
+`goal_complete` let the model manage the goal itself.
+
+Add `.opencode/goals/` to your `.gitignore` (goal state is project-local).
+
 ## Development
 
 ```bash

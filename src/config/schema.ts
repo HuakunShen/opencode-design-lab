@@ -65,6 +65,30 @@ export const DesignLabConfigSchema = z.object({
    * If not specified, uses the first design model
    */
   topic_generator_model: z.string().optional(),
+
+  /**
+   * Goal mode configuration (Codex-style /goal).
+   * All fields optional; unset fields use built-in defaults.
+   */
+  goals: z
+    .object({
+      auto_continue: z.boolean().default(true),
+      max_auto_turns: z.number().int().min(1).default(10),
+      max_duration_ms: z.number().int().min(1).default(15 * 60 * 1000),
+      max_tokens: z.number().int().min(1).default(200000),
+      min_delay_ms: z.number().int().min(0).default(1500),
+      no_progress_token_threshold: z.number().int().min(0).default(50),
+      no_progress_turns_before_pause: z.number().int().min(1).default(2),
+      no_tool_call_turns_before_pause: z.number().int().min(0).default(2),
+      budget_wrapup_ratio: z.number().min(0).max(1).default(0.8),
+      max_prompt_failures: z.number().int().min(1).default(3),
+      persist_state: z.boolean().default(true),
+      state_dir: z.string().default(".opencode/goals"),
+      restricted_agents: z.array(z.string()).default(["plan"]),
+      allow_goal_execution_from_plan: z.boolean().default(false),
+    })
+    .optional()
+    .describe("Codex-style goal mode configuration"),
 });
 
 export type DesignLabConfig = z.infer<typeof DesignLabConfigSchema>;

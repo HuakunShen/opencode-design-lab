@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { loadPluginConfig } from "./config";
+import type { DesignLabConfig } from "./config/schema";
 
-vi.mock("./config", () => ({
-  loadPluginConfig: vi.fn(() => ({
+const { DEFAULT_PLUGIN_CONFIG } = vi.hoisted(() => ({
+  DEFAULT_PLUGIN_CONFIG: {
     models: [
       "openai/gpt-5.2-codex",
       { model: "anthropic/claude-opus-4-5", variant: "xhigh" },
@@ -11,7 +12,11 @@ vi.mock("./config", () => ({
     ],
     default_variant: "max",
     base_output_dir: ".design-lab",
-  })),
+  } as DesignLabConfig,
+}));
+
+vi.mock("./config", () => ({
+  loadPluginConfig: vi.fn(() => DEFAULT_PLUGIN_CONFIG),
 }));
 
 vi.mock("./utils/logger", () => ({
@@ -78,13 +83,16 @@ describe("DesignLab plugin registration", () => {
   });
 
   it("registers a fallback design_lab agent when config is missing", async () => {
-    mockedLoadPluginConfig.mockReturnValueOnce(null);
+    // The plugin resolves the config once at construction (goals hooks) and
+    // again in the config callback, so null must be returned for every call.
+    mockedLoadPluginConfig.mockReturnValue(null);
     const hooks = await DesignLab({
       directory: "/tmp/project",
     } as Parameters<typeof DesignLab>[0]);
     const config = {} as Parameters<NonNullable<typeof hooks.config>>[0];
 
     await hooks.config?.(config);
+    mockedLoadPluginConfig.mockReturnValue(DEFAULT_PLUGIN_CONFIG);
 
     expect(config.command?.["design-lab:ask"]?.agent).toBe("design_lab");
     expect(config.command?.["design-lab:init"]).toBeDefined();
